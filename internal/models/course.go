@@ -5,7 +5,7 @@ import "time"
 type Course struct {
 	ID           int     `db:"id" json:"id"`
 	Title        string  `db:"title" json:"title"`
-	Description  string  `db:"description" json:"description,omitempty"`
+	Description  *string `db:"description" json:"description,omitempty"`
 	Slug         string  `db:"slug" json:"slug"`
 	Price        int     `db:"price" json:"price"`
 	Duration     int     `db:"duration" json:"duration"`
