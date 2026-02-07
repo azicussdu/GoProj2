@@ -25,6 +25,7 @@ func main() {
 
 	db, err := repository.NewPostgresDB(cfg)
 	if err != nil {
+		slog.Error("Error with DB connection")
 		return
 	}
 

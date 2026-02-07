@@ -9,7 +9,9 @@ import (
 
 type Handler struct {
 	courseService *service.CourseService
+	// userService *service.UserService
 	//TODO add other service
+
 }
 
 func NewHandler(cs *service.CourseService) *Handler {
@@ -30,6 +32,9 @@ func (h *Handler) InitRoutes() (*gin.Engine, error) {
 func (h *Handler) GetCourses(c *gin.Context) {
 	courses, err := h.courseService.GetAll()
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed tp select data",
+		})
 		return
 	}
 
