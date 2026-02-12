@@ -29,3 +29,8 @@ func (cs *CourseService) GetByID(id int) (models.Course, error) {
 func (cs *CourseService) DeleteByID(id int) error {
 	return cs.repo.DeleteByID(id)
 }
+
+func (cs *CourseService) Update(id int, input models.UpdateCourse) (int, error) {
+	// will add some logic
+	return cs.repo.Update(id, input)
+}
