@@ -23,20 +23,12 @@ func NewPostgresDB(cfg *config.Config) (*sqlx.DB, error) {
 		cfg.Database.SSLMode,
 	)
 
-	db, err := sqlx.Open("pgx", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("sqlx.Open() error: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err = db.PingContext(ctx); err != nil {
-		err2 := db.Close()
-		if err2 != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("ping db: %w", err)
+	db, err := sqlx.ConnectContext(ctx, "pgx", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("connect db: %w", err)
 	}
 
 	slog.Info("PostgreSQL connected successfully")
