@@ -87,4 +87,8 @@ create table enrollments (
                              constraint unique_user_course
                                  unique (user_id, course_id)
 );
+
+create index idx_lessons_course on lessons(course_id);
+create index idx_enrollments_user on enrollments(user_id);
+create index idx_enrollments_course on enrollments(course_id);
 ```
