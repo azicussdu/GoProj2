@@ -33,7 +33,7 @@
 
 ---
 
-### ТАБЛИЦА COURSES
+### ТАБЛИЦЫ
 
 ```sql
 create type user_role as enum ('student', 'teacher', 'admin');
