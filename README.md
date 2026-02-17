@@ -82,7 +82,10 @@ create table enrollments (
                              id          serial primary key,
                              user_id     integer not null references users(id) on delete cascade,
                              course_id   integer not null references courses(id) on delete cascade,
+                             progress integer not null default 0,
+                             is_completed       boolean not null default false,
                              enrolled_at timestamp not null default now(),
+                             completed_at timestamp null,
 
                              constraint unique_user_course
                                  unique (user_id, course_id)
