@@ -8,6 +8,7 @@ import (
 
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/pkg/utils"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -99,7 +100,7 @@ func (pcr *PsgCourseRepo) Update(id int, input models.UpdateCourse) (int, error)
 	err := pcr.db.Get(&updatedID, query, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, models.ErrNotFound
+			return 0, models.ErrCourseNotFound
 		}
 		return 0, fmt.Errorf("update course: %w", err)
 	}
@@ -131,6 +132,16 @@ func (pcr *PsgCourseRepo) Create(input models.CreateCourse) (int, error) {
 	var id int
 	err = stmt.Get(&id, input)
 	if err != nil {
+
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23503" { // no teacher_id
+				return 0, models.ErrTeacherNotFound
+			} else if pgErr.Code == "23505" { // unique constraint
+				return 0, models.ErrSlugAlreadyExists
+			}
+		}
+
 		return 0, fmt.Errorf("create courses error: %w", err)
 	}
 
@@ -157,7 +168,7 @@ func (pcr *PsgCourseRepo) DeleteByID(id int) error {
 	}
 
 	if rowsAffected == 0 {
-		return models.ErrNotFound
+		return models.ErrCourseNotFound
 	}
 
 	return nil
@@ -178,7 +189,7 @@ func (pcr *PsgCourseRepo) GetByID(id int) (models.Course, error) {
 	err := pcr.db.Get(&course, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.Course{}, models.ErrNotFound
+			return models.Course{}, models.ErrCourseNotFound
 		}
 		return models.Course{}, fmt.Errorf("get course by id err: %w", err)
 	}

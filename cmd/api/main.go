@@ -32,7 +32,10 @@ func main() {
 	courseRepo := repository.NewPsqCourseRepo(db)
 	courseService := service.NewCourseService(courseRepo)
 
-	h := handler.NewHandler(courseService)
+	lessonRepo := repository.NewPsgLessonRepo(db)
+	lessonService := service.NewLessonService(lessonRepo)
+
+	h := handler.NewHandler(courseService, lessonService)
 	router, err := h.InitRoutes()
 
 	srv := server.New(router, cfg.Port)
