@@ -24,7 +24,7 @@ func (h *Handler) UpdateCourse(c *gin.Context) {
 		return
 	}
 
-	updatedID, err := h.services.Course.Update(id, input)
+	updatedID, err := h.services.Course.Update(c.Request.Context(), id, input)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "course to update not found"})

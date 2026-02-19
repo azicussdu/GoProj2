@@ -41,7 +41,7 @@ func (ls *LessonService) DeleteByID(ctx context.Context, id int) error {
 	}
 
 	if course.IsActive {
-		return errors.New("cannot delete lesson without active lessons")
+		return errors.New("cannot delete lesson inside active course")
 	}
 
 	return ls.repo.DeleteByID(ctx, id)

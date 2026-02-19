@@ -42,7 +42,7 @@ func (cs *CourseService) DeleteByID(id int) error {
 	return cs.repo.DeleteByID(id)
 }
 
-func (cs *CourseService) Update(id int, input models.UpdateCourse) (int, error) {
+func (cs *CourseService) Update(ctx context.Context, id int, input models.UpdateCourse) (int, error) {
 
 	if input.IsActive != nil && *input.IsActive == true {
 		lessons, _ := cs.lessonRepo.GetByCourseID(id)
@@ -51,5 +51,5 @@ func (cs *CourseService) Update(id int, input models.UpdateCourse) (int, error) 
 		}
 	}
 
-	return cs.repo.Update(id, input)
+	return cs.repo.Update(ctx, id, input)
 }

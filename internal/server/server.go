@@ -14,7 +14,6 @@ func New(router http.Handler, port string) *Server {
 		httpSrv: &http.Server{
 			Addr:    ":" + port, // "8080"
 			Handler: router,
-			// TODO configs
 		},
 	}
 }

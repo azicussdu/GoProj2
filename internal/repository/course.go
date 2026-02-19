@@ -18,7 +18,7 @@ type CourseRepo interface {
 	GetByID(ctx context.Context, id int) (models.Course, error)
 	DeleteByID(id int) error
 	Create(input models.CreateCourse) (int, error)
-	Update(id int, input models.UpdateCourse) (int, error)
+	Update(ctx context.Context, id int, input models.UpdateCourse) (int, error)
 }
 
 type PsgCourseRepo struct {
@@ -31,7 +31,7 @@ func NewPsqCourseRepo(db *sqlx.DB) *PsgCourseRepo {
 	}
 }
 
-func (pcr *PsgCourseRepo) Update(id int, input models.UpdateCourse) (int, error) {
+func (pcr *PsgCourseRepo) Update(ctx context.Context, id int, input models.UpdateCourse) (int, error) {
 	var setParts []string  // "title", "price"
 	var args []interface{} // "Golang", 30000
 	argID := 1
@@ -98,7 +98,7 @@ func (pcr *PsgCourseRepo) Update(id int, input models.UpdateCourse) (int, error)
 	args = append(args, id)
 
 	var updatedID int
-	err := pcr.db.Get(&updatedID, query, args...)
+	err := pcr.db.GetContext(ctx, &updatedID, query, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, models.ErrCourseNotFound
