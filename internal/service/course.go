@@ -1,20 +1,31 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
 )
 
 type CourseService struct {
-	repo repository.CourseRepo // interface
+	repo       repository.CourseRepo
+	lessonRepo repository.LessonRepo
 }
 
-func NewCourseService(repo repository.CourseRepo) *CourseService {
-	return &CourseService{repo: repo}
+func NewCourseService(repo repository.CourseRepo, lessonRepo repository.LessonRepo) *CourseService {
+	return &CourseService{
+		repo:       repo,
+		lessonRepo: lessonRepo,
+	}
 }
 
 func (cs *CourseService) Create(input models.CreateCourse) (int, error) {
-	// will add some logic
+	if err := input.Validate(); err != nil {
+		return 0, err
+	}
+	// пока нет у него lessons он не может быть активным
+	input.IsActive = false
+
 	return cs.repo.Create(input)
 }
 
@@ -31,6 +42,13 @@ func (cs *CourseService) DeleteByID(id int) error {
 }
 
 func (cs *CourseService) Update(id int, input models.UpdateCourse) (int, error) {
-	// will add some logic
+
+	if input.IsActive != nil && *input.IsActive == true {
+		lessons, _ := cs.lessonRepo.GetByCourseID(id)
+		if len(lessons) == 0 {
+			return 0, errors.New("cannot activate course without lessons")
+		}
+	}
+
 	return cs.repo.Update(id, input)
 }

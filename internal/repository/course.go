@@ -112,10 +112,10 @@ func (pcr *PsgCourseRepo) Create(input models.CreateCourse) (int, error) {
 	query := `
 		INSERT INTO courses (
 		    title, description, slug, price, duration, level,
-			is_active, instructor_id, created_at, updated_at
+			is_active, teacher_id, created_at, updated_at
 		) VALUES (
 			:title, :description, :slug, :price, :duration, :level,
-			:is_active, :instructor_id, :created_at, :updated_at
+			:is_active, :teacher_id, :created_at, :updated_at
 		)
 		RETURNING id
 	`
@@ -179,7 +179,7 @@ func (pcr *PsgCourseRepo) GetByID(id int) (models.Course, error) {
 
 	query := `
 		SELECT id, title, description, slug, price, duration, level,
-		level, is_active, instructor_id, created_at, updated_at, deleted_at
+		is_active, teacher_id, created_at, updated_at, deleted_at
 		FROM courses
 		WHERE id = $1
 		AND deleted_at IS NULL
@@ -202,7 +202,7 @@ func (pcr *PsgCourseRepo) GetAll() ([]models.Course, error) {
 
 	query := `
 		SELECT id, title, description, slug, price, duration, level,
-		level, is_active, instructor_id, created_at, updated_at, deleted_at
+		is_active, teacher_id, created_at, updated_at, deleted_at
 		FROM courses
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC

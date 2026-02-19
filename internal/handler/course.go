@@ -24,7 +24,7 @@ func (h *Handler) UpdateCourse(c *gin.Context) {
 		return
 	}
 
-	updatedID, err := h.courseService.Update(id, input)
+	updatedID, err := h.services.Course.Update(id, input)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "course to update not found"})
@@ -49,7 +49,7 @@ func (h *Handler) CreateCourse(c *gin.Context) {
 		return
 	}
 
-	id, err := h.courseService.Create(input)
+	id, err := h.services.Course.Create(input)
 	if err != nil {
 		var status int
 		var message string
@@ -82,7 +82,7 @@ func (h *Handler) DeleteCourse(c *gin.Context) {
 		return
 	}
 
-	err = h.courseService.DeleteByID(id)
+	err = h.services.Course.DeleteByID(id)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "course to delete not found"})
@@ -102,7 +102,7 @@ func (h *Handler) GetCourseByID(c *gin.Context) {
 		return
 	}
 
-	course, err := h.courseService.GetByID(id)
+	course, err := h.services.Course.GetByID(id)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Course not found"})
@@ -116,7 +116,7 @@ func (h *Handler) GetCourseByID(c *gin.Context) {
 }
 
 func (h *Handler) GetCourses(c *gin.Context) {
-	courses, err := h.courseService.GetAll()
+	courses, err := h.services.Course.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "failed tp select data",

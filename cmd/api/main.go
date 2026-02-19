@@ -11,6 +11,7 @@ import (
 	"github.com/azicussdu/GoProj2/internal/repository"
 	"github.com/azicussdu/GoProj2/internal/server"
 	"github.com/azicussdu/GoProj2/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -23,20 +24,11 @@ func main() {
 	slogger := logger.New(cfg.LogLevel)
 	slog.SetDefault(slogger)
 
-	db, err := repository.NewPostgresDB(cfg)
+	router, err := buildApp(cfg)
 	if err != nil {
-		slog.Error("Error with DB connection")
-		return
+		slog.Error("failed to build app", "error", err.Error())
+		os.Exit(1)
 	}
-
-	courseRepo := repository.NewPsqCourseRepo(db)
-	courseService := service.NewCourseService(courseRepo)
-
-	lessonRepo := repository.NewPsgLessonRepo(db)
-	lessonService := service.NewLessonService(lessonRepo)
-
-	h := handler.NewHandler(courseService, lessonService)
-	router, err := h.InitRoutes()
 
 	srv := server.New(router, cfg.Port)
 	err = srv.Run()
@@ -44,4 +36,30 @@ func main() {
 		slog.Error("failed to start server", "error", err.Error())
 		os.Exit(1)
 	}
+
+	slog.Info("Server started", "port", cfg.Port)
+}
+
+func buildApp(cfg *config.Config) (*gin.Engine, error) {
+	// создаем db - с его помощью будем делать запросы в БД Postgres
+	db, err := repository.NewPostgresDB(cfg)
+	if err != nil {
+		slog.Error("Error with DB connection")
+		return nil, err
+	}
+
+	// Тут только создаем репозитории
+	courseRepo := repository.NewPsqCourseRepo(db)
+	lessonRepo := repository.NewPsgLessonRepo(db)
+
+	// Cобрали все сервисе в одним файле
+	services := &service.Services{
+		Course: service.NewCourseService(courseRepo, lessonRepo),
+		Lesson: service.NewLessonService(lessonRepo, courseRepo),
+	}
+
+	h := handler.NewHandler(services)
+	router, err := h.InitRoutes()
+
+	return router, nil
 }

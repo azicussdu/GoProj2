@@ -15,6 +15,7 @@ import (
 type LessonRepo interface {
 	GetAll() ([]models.Lesson, error)
 	GetByID(id int) (models.Lesson, error)
+	GetByCourseID(courseID int) ([]models.Lesson, error)
 	DeleteByID(id int) error
 	Create(input models.CreateLesson) (int, error)
 	Update(id int, input models.UpdateLesson) (int, error)
@@ -41,6 +42,24 @@ func (plr *PsgLessonRepo) GetAll() ([]models.Lesson, error) {
 
 	if err := plr.db.Select(&lessons, query); err != nil {
 		return nil, fmt.Errorf("get all lessons: %w", err)
+	}
+
+	return lessons, nil
+}
+
+func (plr *PsgLessonRepo) GetByCourseID(courseID int) ([]models.Lesson, error) {
+	var lessons []models.Lesson
+
+	query := `
+		SELECT id, course_id, title, content, video_url, duration, position,
+		is_preview, created_at, updated_at, deleted_at
+		FROM lessons
+		WHERE course_id = $1 AND deleted_at IS NULL
+		ORDER BY created_at ASC
+	`
+
+	if err := plr.db.Select(&lessons, query); err != nil {
+		return nil, fmt.Errorf("get lessons by courseID: %w", err)
 	}
 
 	return lessons, nil

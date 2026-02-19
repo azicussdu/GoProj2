@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"errors"
+	"strings"
+	"time"
+)
 
 type Lesson struct {
 	ID        int     `db:"id" json:"id"`
@@ -28,6 +32,21 @@ type CreateLesson struct {
 
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+}
+
+func (c *CreateLesson) Validate() error {
+	if c.CourseID <= 0 {
+		return errors.New("invalid course id")
+	}
+
+	if strings.TrimSpace(c.Title) == "" {
+		return errors.New("lesson title is required")
+	}
+
+	if c.Content == nil && c.VideoURL == nil {
+		return errors.New("lesson must contain content or video")
+	}
+	return nil
 }
 
 type UpdateLesson struct {
