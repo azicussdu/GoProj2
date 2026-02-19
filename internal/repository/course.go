@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 
 type CourseRepo interface {
 	GetAll() ([]models.Course, error)
-	GetByID(id int) (models.Course, error)
+	GetByID(ctx context.Context, id int) (models.Course, error)
 	DeleteByID(id int) error
 	Create(input models.CreateCourse) (int, error)
 	Update(id int, input models.UpdateCourse) (int, error)
@@ -174,7 +175,7 @@ func (pcr *PsgCourseRepo) DeleteByID(id int) error {
 	return nil
 }
 
-func (pcr *PsgCourseRepo) GetByID(id int) (models.Course, error) {
+func (pcr *PsgCourseRepo) GetByID(ctx context.Context, id int) (models.Course, error) {
 	var course models.Course
 
 	query := `
@@ -186,7 +187,7 @@ func (pcr *PsgCourseRepo) GetByID(id int) (models.Course, error) {
 		LIMIT 1
 	`
 
-	err := pcr.db.Get(&course, query, id)
+	err := pcr.db.GetContext(ctx, &course, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Course{}, models.ErrCourseNotFound

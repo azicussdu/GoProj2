@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -16,8 +17,8 @@ type LessonRepo interface {
 	GetAll() ([]models.Lesson, error)
 	GetByID(id int) (models.Lesson, error)
 	GetByCourseID(courseID int) ([]models.Lesson, error)
-	DeleteByID(id int) error
-	Create(input models.CreateLesson) (int, error)
+	DeleteByID(ctx context.Context, id int) error
+	Create(ctx context.Context, input models.CreateLesson) (int, error)
 	Update(id int, input models.UpdateLesson) (int, error)
 }
 
@@ -88,7 +89,7 @@ func (plr *PsgLessonRepo) GetByID(id int) (models.Lesson, error) {
 	return lesson, nil
 }
 
-func (plr *PsgLessonRepo) DeleteByID(id int) error {
+func (plr *PsgLessonRepo) DeleteByID(ctx context.Context, id int) error {
 	query := `
 		UPDATE lessons
 		SET deleted_at = NOW(),
@@ -97,7 +98,7 @@ func (plr *PsgLessonRepo) DeleteByID(id int) error {
 		AND deleted_at IS NULL
 	`
 
-	result, err := plr.db.Exec(query, id)
+	result, err := plr.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("delete lesson: %w", err)
 	}
@@ -114,7 +115,7 @@ func (plr *PsgLessonRepo) DeleteByID(id int) error {
 	return nil
 }
 
-func (plr *PsgLessonRepo) Create(input models.CreateLesson) (int, error) {
+func (plr *PsgLessonRepo) Create(ctx context.Context, input models.CreateLesson) (int, error) {
 	query := `
 		INSERT INTO lessons (
 			course_id, title, content, video_url, duration, position,
@@ -129,14 +130,14 @@ func (plr *PsgLessonRepo) Create(input models.CreateLesson) (int, error) {
 	input.CreatedAt = utils.Now()
 	input.UpdatedAt = utils.Now()
 
-	stmt, err := plr.db.PrepareNamed(query)
+	stmt, err := plr.db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		return 0, fmt.Errorf("prepare lesson insert query: %w", err)
 	}
 	defer stmt.Close()
 
 	var id int
-	err = stmt.Get(&id, input)
+	err = stmt.GetContext(ctx, &id, input)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {

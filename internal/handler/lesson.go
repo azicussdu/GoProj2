@@ -46,7 +46,8 @@ func (h *Handler) CreateLesson(c *gin.Context) {
 		return
 	}
 
-	id, err := h.services.Lesson.Create(input)
+	ctx := c.Request.Context()
+	id, err := h.services.Lesson.Create(ctx, input)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
@@ -97,7 +98,8 @@ func (h *Handler) DeleteLesson(c *gin.Context) {
 		return
 	}
 
-	err = h.services.Lesson.DeleteByID(id)
+	ctx := c.Request.Context()
+	err = h.services.Lesson.DeleteByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, models.ErrLessonNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "lesson to delete not found"})

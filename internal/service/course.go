@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 
 	"github.com/azicussdu/GoProj2/internal/models"
@@ -33,8 +34,8 @@ func (cs *CourseService) GetAll() ([]models.Course, error) {
 	return cs.repo.GetAll()
 }
 
-func (cs *CourseService) GetByID(id int) (models.Course, error) {
-	return cs.repo.GetByID(id)
+func (cs *CourseService) GetByID(ctx context.Context, id int) (models.Course, error) {
+	return cs.repo.GetByID(ctx, id)
 }
 
 func (cs *CourseService) DeleteByID(id int) error {

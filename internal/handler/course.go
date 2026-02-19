@@ -102,7 +102,8 @@ func (h *Handler) GetCourseByID(c *gin.Context) {
 		return
 	}
 
-	course, err := h.services.Course.GetByID(id)
+	ctx := c.Request.Context()
+	course, err := h.services.Course.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Course not found"})
