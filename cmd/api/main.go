@@ -51,11 +51,13 @@ func buildApp(cfg *config.Config) (*gin.Engine, error) {
 	// Тут только создаем репозитории
 	courseRepo := repository.NewPsqCourseRepo(db)
 	lessonRepo := repository.NewPsgLessonRepo(db)
+	userRepo := repository.NewPsgUserRepo(db)
 
 	// Cобрали все сервисе в одним файле
 	services := &service.Services{
 		Course: service.NewCourseService(courseRepo, lessonRepo),
 		Lesson: service.NewLessonService(lessonRepo, courseRepo),
+		Auth:   service.NewAuthService(userRepo),
 	}
 
 	h := handler.NewHandler(services)
