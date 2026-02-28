@@ -4,20 +4,23 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
+	"github.com/azicussdu/GoProj2/internal/auth"
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	repo repository.UserRepo
-	//tokenManager TokenManager
+	repo         repository.UserRepo
+	tokenManager auth.TokenManager
 }
 
-func NewAuthService(userRepo repository.UserRepo) *AuthService {
+func NewAuthService(userRepo repository.UserRepo, manager auth.TokenManager) *AuthService {
 	return &AuthService{
-		repo: userRepo,
+		repo:         userRepo,
+		tokenManager: manager,
 	}
 }
 
@@ -46,4 +49,39 @@ func (s *AuthService) Register(ctx context.Context, input models.RegisterUser) (
 	}
 
 	return id, nil
+}
+
+func (s *AuthService) Login(ctx context.Context, input models.LoginUser) (models.AuthTokens, error) {
+	input.Email = strings.TrimSpace(strings.ToLower(input.Email))
+	if input.Email == "" || input.Password == "" {
+		return models.AuthTokens{}, errors.New("email and password are required")
+	}
+
+	user, err := s.repo.GetByEmail(ctx, input.Email)
+	if err != nil {
+		if errors.Is(err, models.ErrUserNotFound) {
+			return models.AuthTokens{}, models.ErrInvalidCredentials
+		}
+		return models.AuthTokens{}, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+		return models.AuthTokens{}, models.ErrInvalidCredentials
+	}
+
+	accessToken, accessExp, err := s.tokenManager.NewAccessToken(user)
+	if err != nil {
+		return models.AuthTokens{}, err
+	}
+
+	expiresIn := accessExp - time.Now().Unix()
+	if expiresIn < 0 {
+		expiresIn = 0
+	}
+
+	return models.AuthTokens{
+		AccessToken: accessToken,
+		//RefreshToken: refreshToken,
+		ExpiresIn: expiresIn,
+	}, nil
 }

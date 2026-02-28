@@ -18,19 +18,31 @@ func NewHandler(services *service.Services) *Handler {
 func (h *Handler) InitRoutes() (*gin.Engine, error) {
 	r := gin.New()
 
-	r.POST("/register", h.Register)
+	api := r.Group("/api")
 
-	r.GET("/courses", h.GetCourses)
-	r.GET("/courses/:id", h.GetCourseByID) // localhost:8080/courses/@#@
-	r.DELETE("/courses/:id", h.DeleteCourse)
-	r.POST("/courses", h.CreateCourse)
-	r.PUT("/courses/:id", h.UpdateCourse)
+	auth := api.Group("/auth")
+	{
+		auth.POST("/register", h.Register)
+		auth.POST("/login", h.Login)
+	}
 
-	r.GET("/lessons", h.GetLessons)
-	r.GET("/lessons/:id", h.GetLessonByID)
-	r.DELETE("/lessons/:id", h.DeleteLesson)
-	r.POST("/lessons", h.CreateLesson)
-	r.PUT("/lessons/:id", h.UpdateLesson)
+	courses := api.Group("/courses")
+	{
+		courses.GET("", h.GetCourses)
+		courses.GET("/:id", h.GetCourseByID)
+		courses.DELETE("/:id", h.DeleteCourse)
+		courses.POST("", h.CreateCourse)
+		courses.PUT("/:id", h.UpdateCourse)
+	}
+
+	lessons := api.Group("/lessons")
+	{
+		lessons.GET("", h.GetLessons)
+		lessons.GET("/:id", h.GetLessonByID)
+		lessons.DELETE("/:id", h.DeleteLesson)
+		lessons.POST("", h.CreateLesson)
+		lessons.PUT("/:id", h.UpdateLesson)
+	}
 
 	return r, nil
 }
