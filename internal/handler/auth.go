@@ -48,3 +48,23 @@ func (h *Handler) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, tokens)
 }
+
+func (h *Handler) Refresh(c *gin.Context) {
+	//type refreshInput struct {
+	//	RefreshToken string `json:"refresh_token" binding:"required"`
+	//}
+	//
+	//var input refreshInput
+	//if err := c.ShouldBindJSON(&input); err != nil {
+	//	c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+	//	return
+	//}
+	//
+	//tokens, err := h.services.Auth.Refresh(input.RefreshToken)
+	//if err != nil {
+	//	c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+	//	return
+	//}
+	//
+	//c.JSON(http.StatusOK, tokens)
+}

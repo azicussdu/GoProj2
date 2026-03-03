@@ -63,7 +63,7 @@ func buildApp(cfg *config.Config) (*gin.Engine, error) {
 		Auth:   service.NewAuthService(userRepo, jwtManager),
 	}
 
-	h := handler.NewHandler(services)
+	h := handler.NewHandler(services, jwtManager)
 	router, err := h.InitRoutes()
 
 	return router, nil
