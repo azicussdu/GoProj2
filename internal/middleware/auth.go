@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	"github.com/azicussdu/GoProj2/internal/auth"
+	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/gin-gonic/gin"
 )
+
+const userContextKey = "auth_user"
 
 func Auth(tmanager auth.TokenManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -28,7 +31,37 @@ func Auth(tmanager auth.TokenManager) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("auth_user", *user)
+		c.Set(userContextKey, *user)
+		c.Next()
+	}
+}
+
+func RequireRole(allowedRoles ...string) gin.HandlerFunc {
+
+	allowedMap := make(map[string]struct{}, len(allowedRoles))
+
+	for _, role := range allowedRoles {
+		allowedMap[role] = struct{}{}
+	}
+
+	return func(c *gin.Context) {
+		userVal, ok := c.Get(userContextKey)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "user is not authenticated"})
+			return
+		}
+
+		user, ok := userVal.(models.User)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+			return
+		}
+
+		if _, ok := allowedMap[strings.ToLower(strings.TrimSpace(user.Role))]; !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient role permissions"})
+			return
+		}
+
 		c.Next()
 	}
 }

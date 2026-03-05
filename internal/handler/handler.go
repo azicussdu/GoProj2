@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/azicussdu/GoProj2/internal/auth"
 	"github.com/azicussdu/GoProj2/internal/middleware"
+	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -21,35 +22,48 @@ func NewHandler(services *service.Services, tokenManager auth.TokenManager) *Han
 
 func (h *Handler) InitRoutes() (*gin.Engine, error) {
 	r := gin.New()
-	//r.Use(gin.Logger())
 
 	api := r.Group("/api")
 
-	auth := api.Group("/auth") // api/auth/login
+	// AUTH ROUTES
+	authGroup := api.Group("/auth")
 	{
-		auth.POST("/register", h.Register)
-		auth.POST("/login", h.Login)
-		auth.POST("/refresh", h.Refresh)
+		authGroup.POST("/register", h.Register)
+		authGroup.POST("/login", h.Login)
+		authGroup.POST("/refresh", h.Refresh)
 	}
 
+	// PUBLIC COURSES
 	courses := api.Group("/courses")
-	//courses.Use(gin.Logger())
-	courses.Use(middleware.Auth(h.tokenManager))
 	{
 		courses.GET("", h.GetCourses)
-		courses.GET("/:id", h.GetCourseByID) // GET api/courses/3
-		courses.DELETE("/:id", h.DeleteCourse)
-		courses.POST("", h.CreateCourse)
-		courses.PUT("/:id", h.UpdateCourse)
+		courses.GET("/:id", h.GetCourseByID)
 	}
 
-	lessons := api.Group("/lessons")
+	// PROTECTED ROUTES
+	protected := api.Group("/")
+	protected.Use(middleware.Auth(h.tokenManager))
 	{
-		lessons.GET("", h.GetLessons)
-		lessons.GET("/:id", h.GetLessonByID)
-		lessons.DELETE("/:id", h.DeleteLesson)
-		lessons.POST("", h.CreateLesson)
-		lessons.PUT("/:id", h.UpdateLesson)
+		courses := protected.Group("/courses")
+		courses.Use(middleware.RequireRole(models.RoleTeacher, models.RoleAdmin))
+		{
+			courses.POST("", h.CreateCourse)
+			courses.PUT("/:id", h.UpdateCourse)
+			courses.DELETE("/:id", h.DeleteCourse)
+		}
+
+		// protected lesson actions
+		lessons := protected.Group("/lessons")
+		{
+			lessons.POST("", middleware.RequireRole(models.RoleTeacher, models.RoleAdmin), h.CreateLesson)
+			lessons.PUT("/:id", h.UpdateLesson)
+			lessons.DELETE("/:id", middleware.RequireRole(models.RoleTeacher, models.RoleAdmin), h.DeleteLesson)
+		}
+
+		users := protected.Group("/users")
+		{
+			users.PUT("/:id/role", middleware.RequireRole(models.RoleAdmin), h.ChangeUserRole)
+		}
 	}
 
 	return r, nil

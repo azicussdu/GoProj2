@@ -2,6 +2,21 @@ package models
 
 import "time"
 
+const (
+	RoleAdmin   = "admin"
+	RoleTeacher = "teacher"
+	RoleStudent = "student"
+)
+
+func IsValidRole(role string) bool {
+	switch role {
+	case RoleAdmin, RoleTeacher, RoleStudent:
+		return true
+	default:
+		return false
+	}
+}
+
 type User struct {
 	ID           int       `db:"id" json:"id"`
 	FullName     string    `db:"full_name" json:"full_name"`
@@ -36,4 +51,8 @@ type AuthTokens struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"`
+}
+
+type ChangeUserRoleInput struct {
+	Role string `json:"role" binding:"required"`
 }
