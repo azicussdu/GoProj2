@@ -15,6 +15,8 @@ import (
 type UserRepo interface {
 	GetByEmail(ctx context.Context, email string) (models.User, error)
 	Create(ctx context.Context, input models.CreateUser) (int, error)
+	GetByID(id int) (models.User, error)
+	UpdateRole(id int, role string) (int, error)
 }
 
 var _ UserRepo = (*PsgUserRepo)(nil)
@@ -99,4 +101,54 @@ func (r *PsgUserRepo) Create(ctx context.Context, input models.CreateUser) (int,
 	}
 
 	return id, nil
+}
+
+func (r *PsgUserRepo) GetByID(id int) (models.User, error) {
+	var user models.User
+
+	query := `
+		SELECT
+			id,
+			full_name,
+			email,
+			password_hash,
+			role,
+			is_active,
+			created_at,
+			updated_at
+		FROM users
+		WHERE id = $1
+		LIMIT 1
+	`
+
+	err := r.db.Get(&user, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.User{}, models.ErrUserNotFound
+		}
+		return models.User{}, fmt.Errorf("get user by id: %w", err)
+	}
+
+	return user, nil
+}
+
+func (r *PsgUserRepo) UpdateRole(userID int, role string) (int, error) {
+	query := `
+		UPDATE users
+		SET role = $1,
+		    updated_at = $2
+		WHERE id = $3
+		RETURNING id
+	`
+
+	var updatedID int
+	err := r.db.Get(&updatedID, query, role, utils.Now(), userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, models.ErrRoleChangeOnlyFromStudent
+		}
+		return 0, fmt.Errorf("update user role: %w", err)
+	}
+
+	return updatedID, nil
 }

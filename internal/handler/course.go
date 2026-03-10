@@ -82,7 +82,7 @@ func (h *Handler) DeleteCourse(c *gin.Context) {
 		return
 	}
 
-	err = h.services.Course.DeleteByID(id)
+	err = h.services.Course.DeleteByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, models.ErrCourseNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "course to delete not found"})

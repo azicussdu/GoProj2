@@ -18,6 +18,7 @@ type LessonRepo interface {
 	GetByID(id int) (models.Lesson, error)
 	GetByCourseID(courseID int) ([]models.Lesson, error)
 	DeleteByID(ctx context.Context, id int) error
+	DeleteByCourseIDTx(ctx context.Context, tx *sqlx.Tx, courseID int) error
 	Create(ctx context.Context, input models.CreateLesson) (int, error)
 	Update(id int, input models.UpdateLesson) (int, error)
 }
@@ -110,6 +111,22 @@ func (plr *PsgLessonRepo) DeleteByID(ctx context.Context, id int) error {
 
 	if rowsAffected == 0 {
 		return models.ErrLessonNotFound
+	}
+
+	return nil
+}
+
+func (plr *PsgLessonRepo) DeleteByCourseIDTx(ctx context.Context, tx *sqlx.Tx, courseID int) error {
+	query := `
+		UPDATE lessons
+		SET deleted_at = NOW(),
+		    updated_at = NOW()
+		WHERE course_id = $1
+		  AND deleted_at IS NULL
+	`
+
+	if _, err := tx.ExecContext(ctx, query, courseID); err != nil {
+		return fmt.Errorf("delete lessons by course: %w", err)
 	}
 
 	return nil

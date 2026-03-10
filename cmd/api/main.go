@@ -52,15 +52,17 @@ func buildApp(cfg *config.Config) (*gin.Engine, error) {
 	// Тут только создаем репозитории
 	courseRepo := repository.NewPsqCourseRepo(db)
 	lessonRepo := repository.NewPsgLessonRepo(db)
+	enrollmentRepo := repository.NewPsgEnrollmentRepo(db)
 	userRepo := repository.NewPsgUserRepo(db)
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL, cfg.JWT.Issuer)
 
 	// Cобрали все сервисе в одним файле
 	services := &service.Services{
-		Course: service.NewCourseService(courseRepo, lessonRepo),
-		Lesson: service.NewLessonService(lessonRepo, courseRepo),
-		Auth:   service.NewAuthService(userRepo, jwtManager),
+		Course:     service.NewCourseService(courseRepo, lessonRepo, enrollmentRepo, db),
+		Lesson:     service.NewLessonService(lessonRepo, courseRepo, db),
+		Enrollment: service.NewEnrollmentService(enrollmentRepo, courseRepo),
+		Auth:       service.NewAuthService(userRepo, jwtManager),
 	}
 
 	h := handler.NewHandler(services, jwtManager)

@@ -44,12 +44,20 @@ func (h *Handler) InitRoutes() (*gin.Engine, error) {
 	protected := api.Group("/")
 	protected.Use(middleware.Auth(h.tokenManager))
 	{
-		courses := protected.Group("/courses")
-		courses.Use(middleware.RequireRole(models.RoleTeacher, models.RoleAdmin))
+		teacherCourses := protected.Group("/courses")
+		teacherCourses.Use(middleware.RequireRole(models.RoleTeacher, models.RoleAdmin))
 		{
-			courses.POST("", h.CreateCourse)
-			courses.PUT("/:id", h.UpdateCourse)
-			courses.DELETE("/:id", h.DeleteCourse)
+			teacherCourses.POST("", h.CreateCourse)
+			teacherCourses.PUT("/:id", h.UpdateCourse)
+			teacherCourses.DELETE("/:id", h.DeleteCourse)
+		}
+
+		studentCourses := protected.Group("/courses")
+		studentCourses.Use(middleware.RequireRole(models.RoleStudent))
+		{
+			studentCourses.GET("/my", h.GetMyCourses)
+			studentCourses.POST("/:id/enroll", h.EnrollCourse)
+			studentCourses.DELETE("/:id/enroll", h.LeaveCourse)
 		}
 
 		// protected lesson actions
