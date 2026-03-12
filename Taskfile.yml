@@ -1,0 +1,29 @@
+version: "3"
+
+dotenv:
+  - .env
+
+vars:
+  DB_URL: postgres://{{.DB_USER}}:{{.DB_PASSWORD}}@{{.DB_HOST}}:{{.DB_PORT}}/{{.DB_NAME}}?sslmode={{.SSL_MODE}}
+
+tasks:
+
+  migrate-version:
+    cmds:
+      - migrate -path migrations -database "{{.DB_URL}}" version
+
+  migrate-up:
+    cmds:
+      - migrate -path migrations -database "{{.DB_URL}}" up
+
+  migrate-down:
+    cmds:
+      - migrate -path migrations -database "{{.DB_URL}}" down 1
+
+  migrate-create:
+    cmds:
+      - migrate create -ext sql -dir migrations -seq {{.name}}
+
+  migrate-force:
+    cmds:
+      - migrate -path migrations -database "{{.DB_URL}}" force {{.version}}
