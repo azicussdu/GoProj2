@@ -10,6 +10,7 @@ var (
 	ErrEnrollmentAlreadyExists = errors.New("user is already enrolled in this course")
 	ErrOnlyStudentsCanEnroll   = errors.New("only students can enroll in courses")
 	ErrEnrollmentNotFound      = errors.New("enrollment not found")
+	ErrCourseCannotBeActivated = errors.New("course cannot be activated without lessons")
 )
 
 var (
