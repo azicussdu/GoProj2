@@ -2,72 +2,54 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/azicussdu/GoProj2/internal/models"
-	"github.com/azicussdu/GoProj2/internal/pkg/utils"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 type EnrollmentRepo interface {
 	Exists(ctx context.Context, userID, courseID int) (bool, error)
 	Create(ctx context.Context, input models.CreateEnrollment) (int, error)
 	DeleteByUserAndCourse(ctx context.Context, userID, courseID int) error
-	DeleteByCourseIDTx(ctx context.Context, tx *sqlx.Tx, courseID int) error
+	DeleteByCourseIDTx(ctx context.Context, tx *gorm.DB, courseID int) error
 	GetMyCourses(ctx context.Context, userID int) ([]models.MyCourse, error)
 }
 
 type PsgEnrollmentRepo struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
-func NewPsgEnrollmentRepo(db *sqlx.DB) *PsgEnrollmentRepo {
+func NewPsgEnrollmentRepo(db *gorm.DB) *PsgEnrollmentRepo {
 	return &PsgEnrollmentRepo{db: db}
 }
 
 func (r *PsgEnrollmentRepo) Exists(ctx context.Context, userID, courseID int) (bool, error) {
-	query := `
-		SELECT EXISTS(
-			SELECT 1
-			FROM enrollments
-			WHERE user_id = $1 AND course_id = $2
-		)
-	`
-
-	var exists bool
-	if err := r.db.GetContext(ctx, &exists, query, userID, courseID); err != nil {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Enrollment{}).
+		Where("user_id = ? AND course_id = ?", userID, courseID).
+		Count(&count).Error
+	if err != nil {
 		return false, fmt.Errorf("check enrollment exists: %w", err)
 	}
-
-	return exists, nil
+	return count > 0, nil
 }
 
 func (r *PsgEnrollmentRepo) Create(ctx context.Context, input models.CreateEnrollment) (int, error) {
-	query := `
-		INSERT INTO enrollments (
-			user_id, course_id, progress, is_completed, enrolled_at, completed_at
-		) VALUES (
-			:user_id, :course_id, :progress, :is_completed, :enrolled_at, :completed_at
-		)
-		RETURNING id
-	`
-
-	input.EnrolledAt = utils.Now()
-
-	stmt, err := r.db.PrepareNamedContext(ctx, query)
-	if err != nil {
-		return 0, fmt.Errorf("prepare enrollment insert query: %w", err)
+	enrollment := models.Enrollment{
+		UserID:      input.UserID,
+		CourseID:    input.CourseID,
+		Progress:    input.Progress,
+		IsCompleted: input.IsCompleted,
+		CompletedAt: input.CompletedAt,
 	}
-	defer stmt.Close()
 
-	var id int
-	err = stmt.GetContext(ctx, &id, input)
-	if err != nil {
+	tx := r.db.WithContext(ctx).Create(&enrollment)
+	if tx.Error != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
+		if errors.As(tx.Error, &pgErr) {
 			switch pgErr.Code {
 			case "23503":
 				return 0, models.ErrCourseNotFound
@@ -75,54 +57,37 @@ func (r *PsgEnrollmentRepo) Create(ctx context.Context, input models.CreateEnrol
 				return 0, models.ErrEnrollmentAlreadyExists
 			}
 		}
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, models.ErrCourseNotFound
-		}
-		return 0, fmt.Errorf("create enrollment: %w", err)
+		return 0, fmt.Errorf("create enrollment: %w", tx.Error)
 	}
 
-	return id, nil
+	return enrollment.ID, nil
 }
 
 func (r *PsgEnrollmentRepo) DeleteByUserAndCourse(ctx context.Context, userID, courseID int) error {
-	query := `
-		DELETE FROM enrollments
-		WHERE user_id = $1 AND course_id = $2
-	`
-
-	result, err := r.db.ExecContext(ctx, query, userID, courseID)
-	if err != nil {
-		return fmt.Errorf("delete enrollment: %w", err)
+	tx := r.db.WithContext(ctx).Where("user_id = ? AND course_id = ?", userID, courseID).Delete(&models.Enrollment{})
+	if tx.Error != nil {
+		return fmt.Errorf("delete enrollment: %w", tx.Error)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("delete enrollment rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
+	if tx.RowsAffected == 0 {
 		return models.ErrEnrollmentNotFound
 	}
-
 	return nil
 }
 
-func (r *PsgEnrollmentRepo) DeleteByCourseIDTx(ctx context.Context, tx *sqlx.Tx, courseID int) error {
-	query := `
-		DELETE FROM enrollments
-		WHERE course_id = $1
-	`
-
-	if _, err := tx.ExecContext(ctx, query, courseID); err != nil {
-		return fmt.Errorf("delete enrollments by course: %w", err)
+func (r *PsgEnrollmentRepo) DeleteByCourseIDTx(ctx context.Context, tx *gorm.DB, courseID int) error {
+	result := tx.WithContext(ctx).Where("course_id = ?", courseID).Delete(&models.Enrollment{})
+	if result.Error != nil {
+		return fmt.Errorf("delete enrollments by course: %w", result.Error)
 	}
-
 	return nil
 }
 
 func (r *PsgEnrollmentRepo) GetMyCourses(ctx context.Context, userID int) ([]models.MyCourse, error) {
-	query := `
-		SELECT
+	var myCourses []models.MyCourse
+
+	err := r.db.WithContext(ctx).
+		Table("enrollments e").
+		Select(`
 			c.id AS course_id,
 			c.title,
 			c.description,
@@ -136,15 +101,12 @@ func (r *PsgEnrollmentRepo) GetMyCourses(ctx context.Context, userID int) ([]mod
 			e.is_completed,
 			e.enrolled_at,
 			e.completed_at
-		FROM enrollments e
-		JOIN courses c ON c.id = e.course_id
-		WHERE e.user_id = $1
-		  AND c.deleted_at IS NULL
-		ORDER BY e.enrolled_at DESC
-	`
-
-	var myCourses []models.MyCourse
-	if err := r.db.SelectContext(ctx, &myCourses, query, userID); err != nil {
+		`).
+		Joins("JOIN courses c ON c.id = e.course_id").
+		Where("e.user_id = ? AND c.deleted_at IS NULL", userID).
+		Order("e.enrolled_at DESC").
+		Scan(&myCourses).Error
+	if err != nil {
 		return nil, fmt.Errorf("get my courses: %w", err)
 	}
 

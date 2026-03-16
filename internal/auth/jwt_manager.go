@@ -11,10 +11,10 @@ import (
 )
 
 type Claims struct {
-	UserID    int    `json:"uid"`
-	Email     string `json:"email"`
-	Role      string `json:"role"`
-	TokenType string `json:"type"`
+	UserID    int             `json:"uid"`
+	Email     string          `json:"email"`
+	Role      models.UserRole `json:"role"`
+	TokenType string          `json:"type"`
 	jwt.RegisteredClaims
 }
 

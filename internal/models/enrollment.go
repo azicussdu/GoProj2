@@ -6,38 +6,41 @@ import (
 )
 
 type Enrollment struct {
-	ID          int        `db:"id" json:"id"`
-	UserID      int        `db:"user_id" json:"user_id"`
-	CourseID    int        `db:"course_id" json:"course_id"`
-	Progress    int        `db:"progress" json:"progress"`
-	IsCompleted bool       `db:"is_completed" json:"is_completed"`
-	EnrolledAt  time.Time  `db:"enrolled_at" json:"enrolled_at"`
-	CompletedAt *time.Time `db:"completed_at" json:"completed_at,omitempty"`
+	ID          int        `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UserID      int        `gorm:"column:user_id" json:"user_id"`
+	CourseID    int        `gorm:"column:course_id" json:"course_id"`
+	Progress    int        `gorm:"column:progress" json:"progress"`
+	IsCompleted bool       `gorm:"column:is_completed" json:"is_completed"`
+	EnrolledAt  time.Time  `gorm:"column:enrolled_at;autoCreateTime" json:"enrolled_at"`
+	CompletedAt *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
+}
+
+func (Enrollment) TableName() string {
+	return "enrollments"
 }
 
 type MyCourse struct {
-	CourseID    int        `db:"course_id" json:"course_id"`
-	Title       string     `db:"title" json:"title"`
-	Description *string    `db:"description" json:"description,omitempty"`
-	Slug        string     `db:"slug" json:"slug"`
-	Price       int        `db:"price" json:"price"`
-	Duration    int        `db:"duration" json:"duration"`
-	Level       *string    `db:"level" json:"level,omitempty"`
-	IsActive    bool       `db:"is_active" json:"is_active"`
-	TeacherID   int        `db:"teacher_id" json:"teacher_id"`
-	Progress    int        `db:"progress" json:"progress"`
-	IsCompleted bool       `db:"is_completed" json:"is_completed"`
-	EnrolledAt  time.Time  `db:"enrolled_at" json:"enrolled_at"`
-	CompletedAt *time.Time `db:"completed_at" json:"completed_at,omitempty"`
+	CourseID    int        `gorm:"column:course_id" json:"course_id"`
+	Title       string     `gorm:"column:title" json:"title"`
+	Description *string    `gorm:"column:description" json:"description,omitempty"`
+	Slug        string     `gorm:"column:slug" json:"slug"`
+	Price       int        `gorm:"column:price" json:"price"`
+	Duration    int        `gorm:"column:duration" json:"duration"`
+	Level       *string    `gorm:"column:level" json:"level,omitempty"`
+	IsActive    bool       `gorm:"column:is_active" json:"is_active"`
+	TeacherID   int        `gorm:"column:teacher_id" json:"teacher_id"`
+	Progress    int        `gorm:"column:progress" json:"progress"`
+	IsCompleted bool       `gorm:"column:is_completed" json:"is_completed"`
+	EnrolledAt  time.Time  `gorm:"column:enrolled_at" json:"enrolled_at"`
+	CompletedAt *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
 }
 
 type CreateEnrollment struct {
-	UserID      int        `db:"user_id" json:"user_id" binding:"required"`
-	CourseID    int        `db:"course_id" json:"course_id" binding:"required"`
-	Progress    int        `db:"progress" json:"progress"`
-	IsCompleted bool       `db:"is_completed" json:"is_completed"`
-	EnrolledAt  time.Time  `db:"enrolled_at" json:"enrolled_at"`
-	CompletedAt *time.Time `db:"completed_at" json:"completed_at"`
+	UserID      int        `json:"user_id" binding:"required"`
+	CourseID    int        `json:"course_id" binding:"required"`
+	Progress    int        `json:"progress"`
+	IsCompleted bool       `json:"is_completed"`
+	CompletedAt *time.Time `json:"completed_at"`
 }
 
 func (c *CreateEnrollment) Validate() error {
@@ -57,9 +60,9 @@ func (c *CreateEnrollment) Validate() error {
 }
 
 type UpdateEnrollment struct {
-	Progress    *int       `db:"progress" json:"progress"`
-	IsCompleted *bool      `db:"is_completed" json:"is_completed"`
-	CompletedAt *time.Time `db:"completed_at" json:"completed_at"`
+	Progress    *int       `json:"progress"`
+	IsCompleted *bool      `json:"is_completed"`
+	CompletedAt *time.Time `json:"completed_at"`
 }
 
 func (u *UpdateEnrollment) Validate() error {

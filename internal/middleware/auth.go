@@ -36,9 +36,9 @@ func Auth(tmanager auth.TokenManager) gin.HandlerFunc {
 	}
 }
 
-func RequireRole(allowedRoles ...string) gin.HandlerFunc {
+func RequireRole(allowedRoles ...models.UserRole) gin.HandlerFunc {
 
-	allowedMap := make(map[string]struct{}, len(allowedRoles))
+	allowedMap := make(map[models.UserRole]struct{}, len(allowedRoles))
 
 	for _, role := range allowedRoles {
 		allowedMap[role] = struct{}{}
@@ -57,7 +57,7 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 			return
 		}
 
-		if _, ok := allowedMap[strings.ToLower(strings.TrimSpace(user.Role))]; !ok {
+		if _, ok := allowedMap[user.Role]; !ok {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient role permissions"})
 			return
 		}

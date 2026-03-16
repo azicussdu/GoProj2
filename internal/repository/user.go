@@ -2,14 +2,12 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/azicussdu/GoProj2/internal/models"
-	"github.com/azicussdu/GoProj2/internal/pkg/utils"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 type UserRepo interface {
@@ -22,133 +20,63 @@ type UserRepo interface {
 var _ UserRepo = (*PsgUserRepo)(nil)
 
 type PsgUserRepo struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
-func NewPsgUserRepo(db *sqlx.DB) *PsgUserRepo {
+func NewPsgUserRepo(db *gorm.DB) *PsgUserRepo {
 	return &PsgUserRepo{db: db}
 }
 
 func (r *PsgUserRepo) GetByEmail(ctx context.Context, email string) (models.User, error) {
 	var user models.User
-
-	query := `
-		SELECT
-			id,
-			full_name,
-			email,
-			password_hash,
-			role,
-			is_active,
-			created_at,
-			updated_at
-		FROM users
-		WHERE email = $1
-		LIMIT 1
-	`
-
-	err := r.db.GetContext(ctx, &user, query, email)
+	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.User{}, models.ErrUserNotFound
 		}
 		return models.User{}, fmt.Errorf("get user by email: %w", err)
 	}
-
 	return user, nil
 }
 
 func (r *PsgUserRepo) Create(ctx context.Context, input models.CreateUser) (int, error) {
-	query := `
-		INSERT INTO users (
-			full_name,
-			email,
-			password_hash,
-			created_at,
-			updated_at
-		)
-		VALUES (
-			:full_name,
-			:email,
-			:password_hash,
-			:created_at,
-			:updated_at
-		)
-		RETURNING id
-	`
-
-	input.CreatedAt = utils.Now()
-	input.UpdatedAt = utils.Now()
-
-	stmt, err := r.db.PrepareNamedContext(ctx, query)
-	if err != nil {
-		return 0, fmt.Errorf("prepare create user: %w", err)
+	user := models.User{
+		FullName:     input.FullName,
+		Email:        input.Email,
+		PasswordHash: input.PasswordHash,
 	}
-	defer stmt.Close()
 
-	var id int
-	err = stmt.GetContext(ctx, &id, input)
-	if err != nil {
+	tx := r.db.WithContext(ctx).Create(&user)
+	if tx.Error != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			// 23505 = unique_violation
-			if pgErr.Code == "23505" {
-				return 0, models.ErrUserAlreadyExists
-			} // email exists
+		if errors.As(tx.Error, &pgErr) && pgErr.Code == "23505" {
+			return 0, models.ErrUserAlreadyExists
 		}
-
-		return 0, fmt.Errorf("create user: %w", err)
+		return 0, fmt.Errorf("create user: %w", tx.Error)
 	}
 
-	return id, nil
+	return user.ID, nil
 }
 
 func (r *PsgUserRepo) GetByID(id int) (models.User, error) {
 	var user models.User
-
-	query := `
-		SELECT
-			id,
-			full_name,
-			email,
-			password_hash,
-			role,
-			is_active,
-			created_at,
-			updated_at
-		FROM users
-		WHERE id = $1
-		LIMIT 1
-	`
-
-	err := r.db.Get(&user, query, id)
+	err := r.db.Where("id = ?", id).First(&user).Error
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.User{}, models.ErrUserNotFound
 		}
 		return models.User{}, fmt.Errorf("get user by id: %w", err)
 	}
-
 	return user, nil
 }
 
 func (r *PsgUserRepo) UpdateRole(userID int, role string) (int, error) {
-	query := `
-		UPDATE users
-		SET role = $1,
-		    updated_at = $2
-		WHERE id = $3
-		RETURNING id
-	`
-
-	var updatedID int
-	err := r.db.Get(&updatedID, query, role, utils.Now(), userID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, models.ErrRoleChangeOnlyFromStudent
-		}
-		return 0, fmt.Errorf("update user role: %w", err)
+	tx := r.db.Model(&models.User{}).Where("id = ?", userID).Update("role", role)
+	if tx.Error != nil {
+		return 0, fmt.Errorf("update user role: %w", tx.Error)
 	}
-
-	return updatedID, nil
+	if tx.RowsAffected == 0 {
+		return 0, models.ErrRoleChangeOnlyFromStudent
+	}
+	return userID, nil
 }

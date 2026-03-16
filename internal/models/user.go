@@ -2,38 +2,41 @@ package models
 
 import "time"
 
+type UserRole string
+
 const (
-	RoleAdmin   = "admin"
-	RoleTeacher = "teacher"
-	RoleStudent = "student"
+	RoleAdmin   UserRole = "admin"
+	RoleTeacher UserRole = "teacher"
+	RoleStudent UserRole = "student"
 )
 
 func IsValidRole(role string) bool {
-	switch role {
+	switch UserRole(role) {
 	case RoleAdmin, RoleTeacher, RoleStudent:
 		return true
-	default:
-		return false
 	}
+	return false
 }
 
 type User struct {
-	ID           int       `db:"id" json:"id"`
-	FullName     string    `db:"full_name" json:"full_name"`
-	Email        string    `db:"email" json:"email"`
-	PasswordHash string    `db:"password_hash" json:"-"` // This prevents password hash from being returned in API responses.
-	Role         string    `db:"role" json:"role"`
-	IsActive     bool      `db:"is_active" json:"is_active"`
-	CreatedAt    time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
+	ID           int       `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	FullName     string    `gorm:"column:full_name" json:"full_name"`
+	Email        string    `gorm:"column:email" json:"email"`
+	PasswordHash string    `gorm:"column:password_hash" json:"-"`
+	Role         UserRole  `gorm:"type:user_role;default:'student';not null"`
+	IsActive     bool      `gorm:"column:is_active" json:"is_active"`
+	CreatedAt    time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+}
+
+func (User) TableName() string {
+	return "users"
 }
 
 type CreateUser struct {
-	FullName     string    `db:"full_name" json:"full_name" binding:"required"`
-	Email        string    `db:"email" json:"email" binding:"required"`
-	PasswordHash string    `db:"password_hash" json:"-"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	FullName     string `json:"full_name" binding:"required"`
+	Email        string `json:"email" binding:"required"`
+	PasswordHash string `json:"-"`
 }
 
 type RegisterUser struct {

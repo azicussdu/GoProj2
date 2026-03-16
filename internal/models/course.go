@@ -7,33 +7,34 @@ import (
 )
 
 type Course struct {
-	ID          int     `db:"id" json:"id"`
-	Title       string  `db:"title" json:"title"`
-	Description *string `db:"description" json:"description,omitempty"`
-	Slug        string  `db:"slug" json:"slug"`
-	Price       int     `db:"price" json:"price"`
-	Duration    int     `db:"duration" json:"duration"`
-	Level       *string `db:"level" json:"level,omitempty"`
-	IsActive    bool    `db:"is_active" json:"is_active"`
-	TeacherID   int     `db:"teacher_id" json:"teacher_id"`
+	ID          int        `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Title       string     `gorm:"column:title" json:"title"`
+	Description *string    `gorm:"column:description" json:"description,omitempty"`
+	Slug        string     `gorm:"column:slug" json:"slug"`
+	Price       int        `gorm:"column:price" json:"price"`
+	Duration    int        `gorm:"column:duration" json:"duration"`
+	Level       *string    `gorm:"column:level" json:"level,omitempty"`
+	IsActive    bool       `gorm:"column:is_active" json:"is_active"`
+	TeacherID   int        `gorm:"column:teacher_id" json:"teacher_id"`
+	Teacher     User       `gorm:"foreignKey:TeacherID;references:ID" json:"teacher"`
+	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
+}
 
-	CreatedAt time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time `db:"deleted_at" json:"deleted_at,omitempty"`
+func (Course) TableName() string {
+	return "courses"
 }
 
 type CreateCourse struct {
-	Title       string  `db:"title" json:"title" binding:"required"`
-	Description *string `db:"description" json:"description"`
-	Slug        string  `db:"slug" json:"slug" binding:"required"`
-	Price       int     `db:"price" json:"price"`
-	Duration    int     `db:"duration" json:"duration"`
-	Level       *string `db:"level" json:"level"`
-	IsActive    bool    `db:"is_active" json:"is_active"`
-	TeacherID   int     `db:"teacher_id" json:"teacher_id" binding:"required"`
-
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	Title       string  `json:"title" binding:"required"`
+	Description *string `json:"description"`
+	Slug        string  `json:"slug" binding:"required"`
+	Price       int     `json:"price"`
+	Duration    int     `json:"duration"`
+	Level       *string `json:"level"`
+	IsActive    bool    `json:"is_active"`
+	TeacherID   int     `json:"teacher_id" binding:"required"`
 }
 
 func (c *CreateCourse) Validate() error {
@@ -48,14 +49,14 @@ func (c *CreateCourse) Validate() error {
 }
 
 type UpdateCourse struct {
-	Title       *string `db:"title" json:"title"`
-	Description *string `db:"description" json:"description"`
-	Slug        *string `db:"slug" json:"slug"`
-	Price       *int    `db:"price" json:"price"`
-	Duration    *int    `db:"duration" json:"duration"`
-	Level       *string `db:"level" json:"level"`
-	IsActive    *bool   `db:"is_active" json:"is_active"`
-	TeacherID   *int    `db:"teacher_id" json:"teacher_id"`
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Slug        *string `json:"slug"`
+	Price       *int    `json:"price"`
+	Duration    *int    `json:"duration"`
+	Level       *string `json:"level"`
+	IsActive    *bool   `json:"is_active"`
+	TeacherID   *int    `json:"teacher_id"`
 }
 
 func (c *UpdateCourse) Validate() error {

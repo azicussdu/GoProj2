@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,12 +18,13 @@ type Config struct {
 }
 
 type DBConfig struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host        string
+	Port        string
+	Username    string
+	Password    string
+	DBName      string
+	SSLMode     string
+	AutoMigrate bool
 }
 
 type JWTConfig struct {
@@ -52,12 +54,13 @@ func Load() (*Config, error) {
 		LogLevel: getEnv("LOG_LEVEL", "INFO"),
 
 		Database: &DBConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			Username: getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "postgres"),
-			DBName:   getEnv("DB_NAME", "postgres"),
-			SSLMode:  getEnv("SSL_MODE", "disable"),
+			Host:        getEnv("DB_HOST", "localhost"),
+			Port:        getEnv("DB_PORT", "5432"),
+			Username:    getEnv("DB_USER", "postgres"),
+			Password:    getEnv("DB_PASSWORD", "postgres"),
+			DBName:      getEnv("DB_NAME", "postgres"),
+			SSLMode:     getEnv("SSL_MODE", "disable"),
+			AutoMigrate: getBoolEnv("DB_AUTO_MIGRATE", false),
 		},
 		JWT: &JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "secret-key"),
@@ -83,4 +86,18 @@ func parseDurationEnv(key, defaultValue string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid duration for %s: %w", key, err)
 	}
 	return duration, nil
+}
+
+func getBoolEnv(key string, defaultValue bool) bool {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return defaultValue
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+
+	return parsed
 }

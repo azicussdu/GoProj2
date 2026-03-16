@@ -6,20 +6,17 @@ import (
 
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
-	"github.com/jmoiron/sqlx"
 )
 
 type LessonService struct {
 	repo       repository.LessonRepo
 	courseRepo repository.CourseRepo
-	db         *sqlx.DB
 }
 
-func NewLessonService(repo repository.LessonRepo, courseRepo repository.CourseRepo, db *sqlx.DB) *LessonService {
+func NewLessonService(repo repository.LessonRepo, courseRepo repository.CourseRepo) *LessonService {
 	return &LessonService{
 		repo:       repo,
 		courseRepo: courseRepo,
-		db:         db,
 	}
 }
 

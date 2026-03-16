@@ -2,244 +2,160 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/azicussdu/GoProj2/internal/models"
-	"github.com/azicussdu/GoProj2/internal/pkg/utils"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 type CourseRepo interface {
 	GetAll() ([]models.Course, error)
 	GetByID(ctx context.Context, id int) (models.Course, error)
 	DeleteByID(id int) error
-	DeleteByIDTx(ctx context.Context, tx *sqlx.Tx, id int) error
+	DeleteByIDTx(ctx context.Context, tx *gorm.DB, id int) error
 	Create(input models.CreateCourse) (int, error)
 	Update(ctx context.Context, id int, input models.UpdateCourse) (int, error)
 }
 
 type PsgCourseRepo struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
-func NewPsqCourseRepo(db *sqlx.DB) *PsgCourseRepo {
-	return &PsgCourseRepo{
-		db: db,
-	}
+func NewPsqCourseRepo(db *gorm.DB) *PsgCourseRepo {
+	return &PsgCourseRepo{db: db}
 }
 
 func (pcr *PsgCourseRepo) Update(ctx context.Context, id int, input models.UpdateCourse) (int, error) {
-	var setParts []string  // "title", "price"
-	var args []interface{} // "Golang", 30000
-	argID := 1
+	updates := map[string]any{}
 
 	if input.Title != nil {
-		setParts = append(setParts, fmt.Sprintf("title = $%d", argID))
-		args = append(args, *input.Title)
-		argID++
+		updates["title"] = *input.Title
 	}
-
 	if input.Description != nil {
-		setParts = append(setParts, fmt.Sprintf("description = $%d", argID))
-		args = append(args, *input.Description)
-		argID++
+		updates["description"] = *input.Description
 	}
-
 	if input.Slug != nil {
-		setParts = append(setParts, fmt.Sprintf("slug = $%d", argID))
-		args = append(args, *input.Slug)
-		argID++
+		updates["slug"] = *input.Slug
 	}
-
 	if input.Price != nil {
-		setParts = append(setParts, fmt.Sprintf("price = $%d", argID))
-		args = append(args, *input.Price)
-		argID++
+		updates["price"] = *input.Price
 	}
-
 	if input.Duration != nil {
-		setParts = append(setParts, fmt.Sprintf("duration = $%d", argID))
-		args = append(args, *input.Duration)
-		argID++
+		updates["duration"] = *input.Duration
 	}
-
 	if input.Level != nil {
-		setParts = append(setParts, fmt.Sprintf("level = $%d", argID))
-		args = append(args, *input.Level)
-		argID++
+		updates["level"] = *input.Level
 	}
-
 	if input.IsActive != nil {
-		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argID))
-		args = append(args, *input.IsActive)
-		argID++
+		updates["is_active"] = *input.IsActive
+	}
+	if input.TeacherID != nil {
+		updates["teacher_id"] = *input.TeacherID
 	}
 
-	if len(setParts) == 0 {
+	if len(updates) == 0 {
 		return 0, errors.New("no fields to update")
 	}
 
-	// updated_at через аргумент (лучше, чем NOW())
-	setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argID))
-	args = append(args, utils.Now())
-	argID++
-
-	query := fmt.Sprintf(`
-		UPDATE courses
-		SET %s
-		WHERE id = $%d
-		AND deleted_at IS NULL
-		RETURNING id
-	`, strings.Join(setParts, ", "), argID)
-
-	args = append(args, id)
-
-	var updatedID int
-	err := pcr.db.GetContext(ctx, &updatedID, query, args...)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, models.ErrCourseNotFound
-		}
-		return 0, fmt.Errorf("update course: %w", err)
-	}
-
-	return updatedID, nil
-}
-
-func (pcr *PsgCourseRepo) Create(input models.CreateCourse) (int, error) {
-	query := `
-		INSERT INTO courses (
-		    title, description, slug, price, duration, level,
-			is_active, teacher_id, created_at, updated_at
-		) VALUES (
-			:title, :description, :slug, :price, :duration, :level,
-			:is_active, :teacher_id, :created_at, :updated_at
-		)
-		RETURNING id
-	`
-
-	input.CreatedAt = utils.Now()
-	input.UpdatedAt = utils.Now()
-
-	stmt, err := pcr.db.PrepareNamed(query) // Get, Select, Exec
-	if err != nil {
-		return 0, fmt.Errorf("prepare query error: %w", err)
-	}
-	defer stmt.Close()
-
-	var id int
-	err = stmt.Get(&id, input)
-	if err != nil {
-
+	tx := pcr.db.WithContext(ctx).Model(&models.Course{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(updates)
+	if tx.Error != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23503" { // no teacher_id
+		if errors.As(tx.Error, &pgErr) {
+			switch pgErr.Code {
+			case "23503":
 				return 0, models.ErrTeacherNotFound
-			} else if pgErr.Code == "23505" { // unique constraint
+			case "23505":
 				return 0, models.ErrSlugAlreadyExists
 			}
 		}
+		return 0, fmt.Errorf("update course: %w", tx.Error)
+	}
 
-		return 0, fmt.Errorf("create courses error: %w", err)
+	if tx.RowsAffected == 0 {
+		return 0, models.ErrCourseNotFound
 	}
 
 	return id, nil
 }
 
+func (pcr *PsgCourseRepo) Create(input models.CreateCourse) (int, error) {
+	course := models.Course{
+		Title:       input.Title,
+		Description: input.Description,
+		Slug:        input.Slug,
+		Price:       input.Price,
+		Duration:    input.Duration,
+		Level:       input.Level,
+		IsActive:    input.IsActive,
+		TeacherID:   input.TeacherID,
+	}
+
+	tx := pcr.db.Create(&course)
+	if tx.Error != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(tx.Error, &pgErr) {
+			switch pgErr.Code {
+			case "23503":
+				return 0, models.ErrTeacherNotFound
+			case "23505":
+				return 0, models.ErrSlugAlreadyExists
+			}
+		}
+		return 0, fmt.Errorf("create course error: %w", tx.Error)
+	}
+
+	return course.ID, nil
+}
+
 func (pcr *PsgCourseRepo) DeleteByID(id int) error {
-	query := `
-		UPDATE courses
-		SET deleted_at = NOW(),
-		    updated_at = NOW()
-		WHERE id = $1
-		AND deleted_at IS NULL
-	`
-
-	result, err := pcr.db.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("delete course error: %w", err)
+	result := pcr.db.Model(&models.Course{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("NOW()")})
+	if result.Error != nil {
+		return fmt.Errorf("delete course error: %w", result.Error)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return models.ErrCourseNotFound
 	}
-
 	return nil
 }
 
-func (pcr *PsgCourseRepo) DeleteByIDTx(ctx context.Context, tx *sqlx.Tx, id int) error {
-	query := `
-		UPDATE courses
-		SET deleted_at = NOW(),
-		    updated_at = NOW()
-		WHERE id = $1
-		AND deleted_at IS NULL
-	`
-
-	result, err := tx.ExecContext(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("delete course error: %w", err)
+func (pcr *PsgCourseRepo) DeleteByIDTx(ctx context.Context, tx *gorm.DB, id int) error {
+	result := tx.WithContext(ctx).Model(&models.Course{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("NOW()")})
+	if result.Error != nil {
+		return fmt.Errorf("delete course error: %w", result.Error)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return models.ErrCourseNotFound
 	}
-
 	return nil
 }
 
 func (pcr *PsgCourseRepo) GetByID(ctx context.Context, id int) (models.Course, error) {
 	var course models.Course
-
-	query := `
-		SELECT id, title, description, slug, price, duration, level,
-		is_active, teacher_id, created_at, updated_at, deleted_at
-		FROM courses
-		WHERE id = $1
-		AND deleted_at IS NULL
-		LIMIT 1
-	`
-
-	err := pcr.db.GetContext(ctx, &course, query, id)
+	err := pcr.db.WithContext(ctx).
+		Where("id = ? AND deleted_at IS NULL", id).
+		First(&course).Error
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.Course{}, models.ErrCourseNotFound
 		}
-		return models.Course{}, fmt.Errorf("get course by id err: %w", err)
+		return models.Course{}, fmt.Errorf("get course by id error: %w", err)
 	}
-
 	return course, nil
 }
 
 func (pcr *PsgCourseRepo) GetAll() ([]models.Course, error) {
 	var courses []models.Course
-
-	query := `
-		SELECT id, title, description, slug, price, duration, level,
-		is_active, teacher_id, created_at, updated_at, deleted_at
-		FROM courses
-		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-	`
-
-	err := pcr.db.Select(&courses, query)
+	err := pcr.db.Where("deleted_at IS NULL").Order("created_at DESC").Find(&courses).Error
 	if err != nil {
 		return nil, err
 	}
-
 	return courses, nil
 }

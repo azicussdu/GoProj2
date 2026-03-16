@@ -6,21 +6,21 @@ import (
 
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 type CourseService struct {
 	repo       repository.CourseRepo
 	lessonRepo repository.LessonRepo
 	enrollRepo repository.EnrollmentRepo
-	db         *sqlx.DB
+	db         *gorm.DB
 }
 
 func NewCourseService(
 	repo repository.CourseRepo,
 	lessonRepo repository.LessonRepo,
 	enrollRepo repository.EnrollmentRepo,
-	db *sqlx.DB,
+	db *gorm.DB,
 ) *CourseService {
 	return &CourseService{
 		repo:       repo,
@@ -34,7 +34,6 @@ func (cs *CourseService) Create(input models.CreateCourse) (int, error) {
 	if err := input.Validate(); err != nil {
 		return 0, err
 	}
-	// пока нет у него lessons он не может быть активным
 	input.IsActive = false
 
 	return cs.repo.Create(input)
@@ -49,33 +48,38 @@ func (cs *CourseService) GetByID(ctx context.Context, id int) (models.Course, er
 }
 
 func (cs *CourseService) DeleteByID(ctx context.Context, id int) error {
-	tx, err := cs.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
+	tx := cs.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		if tx.Error != nil {
+			tx.Rollback()
+		}
 	}()
 
-	if err = cs.lessonRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
+	if err := cs.lessonRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
+		tx.Rollback()
 		return err
 	}
 
-	if err = cs.enrollRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
+	if err := cs.enrollRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
+		tx.Rollback()
 		return err
 	}
 
-	if err = cs.repo.DeleteByIDTx(ctx, tx, id); err != nil {
+	if err := cs.repo.DeleteByIDTx(ctx, tx, id); err != nil {
+		tx.Rollback()
 		return err
 	}
 
-	return tx.Commit()
+	return tx.Commit().Error
 }
 
 func (cs *CourseService) Update(ctx context.Context, id int, input models.UpdateCourse) (int, error) {
 
-	if input.IsActive != nil && *input.IsActive == true {
+	if input.IsActive != nil && *input.IsActive {
 		lessons, _ := cs.lessonRepo.GetByCourseID(id)
 		if len(lessons) == 0 {
 			return 0, errors.New("cannot activate course without lessons")

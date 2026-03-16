@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
@@ -25,8 +24,7 @@ func (s *EnrollmentService) JoinCourse(ctx context.Context, user models.User, co
 		return 0, models.ErrUserNotFound
 	}
 
-	role := strings.TrimSpace(strings.ToLower(user.Role))
-	if role != models.RoleStudent {
+	if user.Role != models.RoleStudent {
 		return 0, models.ErrOnlyStudentsCanEnroll
 	}
 
@@ -58,8 +56,7 @@ func (s *EnrollmentService) LeaveCourse(ctx context.Context, user models.User, c
 		return models.ErrUserNotFound
 	}
 
-	role := strings.TrimSpace(strings.ToLower(user.Role))
-	if role != models.RoleStudent {
+	if user.Role != models.RoleStudent {
 		return models.ErrOnlyStudentsCanEnroll
 	}
 
@@ -75,8 +72,7 @@ func (s *EnrollmentService) GetMyCourses(ctx context.Context, user models.User) 
 		return nil, models.ErrUserNotFound
 	}
 
-	role := strings.TrimSpace(strings.ToLower(user.Role))
-	if role != models.RoleStudent {
+	if user.Role != models.RoleStudent {
 		return nil, models.ErrOnlyStudentsCanEnroll
 	}
 

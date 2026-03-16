@@ -136,7 +136,7 @@ func (s *AuthService) ChangeUserRole(userID int, newRole string) (int, error) {
 		return 0, err
 	}
 
-	if strings.ToLower(strings.TrimSpace(user.Role)) != models.RoleStudent {
+	if user.Role != models.RoleStudent {
 		return 0, models.ErrRoleChangeOnlyFromStudent
 	}
 
