@@ -4,22 +4,24 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Course struct {
-	ID          int        `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Title       string     `gorm:"column:title" json:"title"`
-	Description *string    `gorm:"column:description" json:"description,omitempty"`
-	Slug        string     `gorm:"column:slug" json:"slug"`
-	Price       int        `gorm:"column:price" json:"price"`
-	Duration    int        `gorm:"column:duration" json:"duration"`
-	Level       *string    `gorm:"column:level" json:"level,omitempty"`
-	IsActive    bool       `gorm:"column:is_active" json:"is_active"`
-	TeacherID   int        `gorm:"column:teacher_id" json:"teacher_id"`
-	Teacher     User       `gorm:"foreignKey:TeacherID;references:ID" json:"teacher"`
-	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
+	ID          int            `gorm:"primaryKey;autoIncrement" json:"id"` // primaryKey;autoIncrement - kerek emes a tak id bolsa
+	Title       string         `gorm:"type:varchar(255);not null" json:"title"`
+	Description *string        `json:"description,omitempty"`
+	Slug        string         `gorm:"type:varchar(255);unique;not null" json:"slug"`
+	Price       int            `gorm:"default:0;not null" json:"price"`
+	Duration    int            `gorm:"default:0;not null" json:"duration"`
+	Level       *string        `gorm:"type:varchar(50)" json:"level,omitempty"`
+	IsActive    bool           `gorm:"default:false;not null" json:"is_active"`
+	TeacherID   int            `gorm:"not null" json:"teacher_id"`
+	Teacher     User           `gorm:"foreignKey:TeacherID;constraint:OnDelete:RESTRICT" json:"teacher"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (Course) TableName() string {

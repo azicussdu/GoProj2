@@ -19,14 +19,14 @@ func IsValidRole(role string) bool {
 }
 
 type User struct {
-	ID           int       `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	FullName     string    `gorm:"column:full_name" json:"full_name"`
-	Email        string    `gorm:"column:email" json:"email"`
-	PasswordHash string    `gorm:"column:password_hash" json:"-"`
+	ID           int       `gorm:"type:serial" json:"type:id"`
+	FullName     string    `gorm:"type:varchar(255);not null" json:"full_name"`
+	Email        string    `gorm:"type:varchar(255);unique;not null" json:"email"`
+	PasswordHash string    `gorm:"not null" json:"-"`
 	Role         UserRole  `gorm:"type:user_role;default:'student';not null"`
-	IsActive     bool      `gorm:"column:is_active" json:"is_active"`
-	CreatedAt    time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	IsActive     bool      `gorm:"default:true;not null" json:"is_active"`
+	CreatedAt    time.Time `gorm:"default:now();not null" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"default:now();not null" json:"updated_at"`
 }
 
 func (User) TableName() string {

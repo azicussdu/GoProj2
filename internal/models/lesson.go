@@ -4,20 +4,25 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Lesson struct {
-	ID        int        `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	CourseID  int        `gorm:"column:course_id" json:"course_id"`
-	Title     string     `gorm:"column:title" json:"title"`
-	Content   *string    `gorm:"column:content" json:"content,omitempty"`
-	VideoURL  *string    `gorm:"column:video_url" json:"video_url,omitempty"`
-	Duration  int        `gorm:"column:duration" json:"duration"`
-	Position  int        `gorm:"column:position" json:"position"`
-	IsPreview bool       `gorm:"column:is_preview" json:"is_preview"`
-	CreatedAt time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
+	ID int `json:"id"`
+
+	CourseID int    `gorm:"not null;index" json:"course_id"`
+	Course   Course `gorm:"foreignKey:CourseID;constraint:OnDelete:CASCADE"`
+
+	Title     string         `gorm:"type:varchar(255);not null" json:"title"`
+	Content   *string        `json:"content,omitempty"`
+	VideoURL  *string        `json:"video_url,omitempty"`
+	Duration  int            `gorm:"default:0;not null" json:"duration"`
+	Position  int            `gorm:"default:0;not null" json:"position"`
+	IsPreview bool           `gorm:"default:false;not null" json:"is_preview"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 func (Lesson) TableName() string {

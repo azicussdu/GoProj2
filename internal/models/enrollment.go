@@ -6,13 +6,17 @@ import (
 )
 
 type Enrollment struct {
-	ID          int        `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	UserID      int        `gorm:"column:user_id" json:"user_id"`
-	CourseID    int        `gorm:"column:course_id" json:"course_id"`
-	Progress    int        `gorm:"column:progress" json:"progress"`
-	IsCompleted bool       `gorm:"column:is_completed" json:"is_completed"`
-	EnrolledAt  time.Time  `gorm:"column:enrolled_at;autoCreateTime" json:"enrolled_at"`
-	CompletedAt *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
+	ID       int `json:"id"`
+	UserID   int `gorm:"not null;uniqueIndex:idx_user_course" json:"user_id"`
+	CourseID int `gorm:"not null;uniqueIndex:idx_user_course" json:"course_id"`
+
+	User   User   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Course Course `gorm:"foreignKey:CourseID;constraint:OnDelete:CASCADE"`
+
+	Progress    int        `gorm:"default:0;not null" json:"progress"`
+	IsCompleted bool       `gorm:"default:false;not null" json:"is_completed"`
+	EnrolledAt  time.Time  `gorm:"autoCreateTime" json:"enrolled_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
 func (Enrollment) TableName() string {
