@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/azicussdu/GoProj2/internal/auth"
 	"github.com/azicussdu/GoProj2/internal/config"
@@ -42,6 +44,7 @@ func main() {
 }
 
 func buildApp(cfg *config.Config) (*gin.Engine, error) {
+	fmt.Println(time.Now())
 	db, err := repository.NewPostgresDB(cfg)
 	if err != nil {
 		slog.Error("error with DB connection")

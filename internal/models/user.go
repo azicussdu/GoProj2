@@ -25,8 +25,8 @@ type User struct {
 	PasswordHash string    `gorm:"not null" json:"-"`
 	Role         UserRole  `gorm:"type:user_role;default:'student';not null"`
 	IsActive     bool      `gorm:"default:true;not null" json:"is_active"`
-	CreatedAt    time.Time `gorm:"default:now();not null" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"default:now();not null" json:"updated_at"`
+	CreatedAt    time.Time `gorm:"not null" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"not null" json:"updated_at"`
 }
 
 func (User) TableName() string {

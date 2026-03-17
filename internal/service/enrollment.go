@@ -67,7 +67,7 @@ func (s *EnrollmentService) LeaveCourse(ctx context.Context, user models.User, c
 	return s.repo.DeleteByUserAndCourse(ctx, user.ID, courseID)
 }
 
-func (s *EnrollmentService) GetMyCourses(ctx context.Context, user models.User) ([]models.MyCourse, error) {
+func (s *EnrollmentService) GetMyCourses(ctx context.Context, user models.User) ([]models.Enrollment, error) {
 	if user.ID <= 0 {
 		return nil, models.ErrUserNotFound
 	}

@@ -102,7 +102,7 @@ func (h *Handler) GetMyCourses(c *gin.Context) {
 		return
 	}
 
-	courses, err := h.services.Enrollment.GetMyCourses(c.Request.Context(), user)
+	coursesEnrolled, err := h.services.Enrollment.GetMyCourses(c.Request.Context(), user)
 	if err != nil {
 		if errors.Is(err, models.ErrOnlyStudentsCanEnroll) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -112,5 +112,5 @@ func (h *Handler) GetMyCourses(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, courses)
+	c.JSON(http.StatusOK, coursesEnrolled)
 }

@@ -10,7 +10,7 @@ type Enrollment struct {
 	UserID   int `gorm:"not null;uniqueIndex:idx_user_course" json:"user_id"`
 	CourseID int `gorm:"not null;uniqueIndex:idx_user_course" json:"course_id"`
 
-	User   User   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	User   User   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"-"`
 	Course Course `gorm:"foreignKey:CourseID;constraint:OnDelete:CASCADE"`
 
 	Progress    int        `gorm:"default:0;not null" json:"progress"`

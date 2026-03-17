@@ -15,7 +15,7 @@ type EnrollmentRepo interface {
 	Create(ctx context.Context, input models.CreateEnrollment) (int, error)
 	DeleteByUserAndCourse(ctx context.Context, userID, courseID int) error
 	DeleteByCourseIDTx(ctx context.Context, tx *gorm.DB, courseID int) error
-	GetMyCourses(ctx context.Context, userID int) ([]models.MyCourse, error)
+	GetMyCourses(ctx context.Context, userID int) ([]models.Enrollment, error)
 }
 
 type PsgEnrollmentRepo struct {
@@ -82,7 +82,23 @@ func (r *PsgEnrollmentRepo) DeleteByCourseIDTx(ctx context.Context, tx *gorm.DB,
 	return nil
 }
 
-func (r *PsgEnrollmentRepo) GetMyCourses(ctx context.Context, userID int) ([]models.MyCourse, error) {
+func (r *PsgEnrollmentRepo) GetMyCourses(ctx context.Context, userID int) ([]models.Enrollment, error) {
+	var enrollments []models.Enrollment
+
+	err := r.db.WithContext(ctx).
+		Preload("Course").
+		Where("user_id = ?", userID).
+		Order("enrolled_at DESC").
+		Find(&enrollments).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return enrollments, nil
+}
+
+func (r *PsgEnrollmentRepo) GetMyCourses2(ctx context.Context, userID int) ([]models.MyCourse, error) {
 	var myCourses []models.MyCourse
 
 	err := r.db.WithContext(ctx).
