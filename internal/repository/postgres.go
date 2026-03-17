@@ -41,7 +41,6 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 			&models.Course{},
 			&models.Lesson{},
 			&models.Enrollment{},
-			&models.LessonCompletion{},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("auto-migrate db error: %w", err)

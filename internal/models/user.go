@@ -19,7 +19,7 @@ func IsValidRole(role string) bool {
 }
 
 type User struct {
-	ID           int       `gorm:"type:serial" json:"type:id"`
+	ID           int       `json:"type:id"`
 	FullName     string    `gorm:"type:varchar(255);not null" json:"full_name"`
 	Email        string    `gorm:"type:varchar(255);unique;not null" json:"email"`
 	PasswordHash string    `gorm:"not null" json:"-"`
