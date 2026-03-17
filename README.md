@@ -135,3 +135,12 @@ task migrate-create name=create_users
 task migrate-up
 task migrate-down
 ```
+
+---
+
+### GORM
+
+```bash
+go get gorm.io/gorm
+go get gorm.io/driver/postgres
+```
