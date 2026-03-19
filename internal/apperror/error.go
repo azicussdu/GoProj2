@@ -28,6 +28,14 @@ func BadRequest(message string, err error) *AppError {
 	return New(http.StatusBadRequest, message, err)
 }
 
+func Unauthorized(msg string, err error) *AppError {
+	return New(http.StatusUnauthorized, msg, err)
+}
+
+func Forbidden(msg string, err error) *AppError {
+	return New(http.StatusForbidden, msg, err)
+}
+
 func NotFound(msg string, err error) *AppError {
 	return New(http.StatusNotFound, msg, err)
 }

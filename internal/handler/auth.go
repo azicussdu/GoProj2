@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -19,11 +18,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	id, err := h.services.Auth.Register(c.Request.Context(), input)
 	if err != nil {
-		if errors.Is(err, models.ErrUserAlreadyExists) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register"})
+		respondError(c, err)
 		return
 	}
 
@@ -39,11 +34,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	tokens, err := h.services.Auth.Login(c.Request.Context(), input)
 	if err != nil {
-		if errors.Is(err, models.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to login"})
+		respondError(c, err)
 		return
 	}
 
@@ -63,7 +54,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 	tokens, err := h.services.Auth.Refresh(input.RefreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+		respondError(c, err)
 		return
 	}
 
@@ -85,20 +76,8 @@ func (h *Handler) ChangeUserRole(c *gin.Context) {
 
 	updatedID, err := h.services.Auth.ChangeUserRole(userID, input.Role)
 	if err != nil {
-		switch {
-		case errors.Is(err, models.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			return
-		case errors.Is(err, models.ErrInvalidRole):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "role must be teacher or admin"})
-			return
-		case errors.Is(err, models.ErrRoleChangeOnlyFromStudent):
-			c.JSON(http.StatusConflict, gin.H{"error": "only student role can be changed"})
-			return
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change user role"})
-			return
-		}
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"id": updatedID})

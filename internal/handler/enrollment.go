@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -30,20 +29,8 @@ func (h *Handler) EnrollCourse(c *gin.Context) {
 
 	enrollmentID, err := h.services.Enrollment.JoinCourse(c.Request.Context(), user, courseID)
 	if err != nil {
-		switch {
-		case errors.Is(err, models.ErrOnlyStudentsCanEnroll):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			return
-		case errors.Is(err, models.ErrCourseNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
-			return
-		case errors.Is(err, models.ErrEnrollmentAlreadyExists):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enroll in course"})
-			return
-		}
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": enrollmentID})
@@ -70,20 +57,8 @@ func (h *Handler) LeaveCourse(c *gin.Context) {
 
 	err = h.services.Enrollment.LeaveCourse(c.Request.Context(), user, courseID)
 	if err != nil {
-		switch {
-		case errors.Is(err, models.ErrOnlyStudentsCanEnroll):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			return
-		case errors.Is(err, models.ErrCourseNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
-			return
-		case errors.Is(err, models.ErrEnrollmentNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to leave course"})
-			return
-		}
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusNoContent, gin.H{"message": "left course"})
@@ -104,11 +79,7 @@ func (h *Handler) GetMyCourses(c *gin.Context) {
 
 	courses, err := h.services.Enrollment.GetMyCourses(c.Request.Context(), user)
 	if err != nil {
-		if errors.Is(err, models.ErrOnlyStudentsCanEnroll) {
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get my courses"})
+		respondError(c, err)
 		return
 	}
 

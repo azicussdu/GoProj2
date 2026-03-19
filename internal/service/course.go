@@ -33,7 +33,7 @@ func NewCourseService(
 
 func (cs *CourseService) Create(input models.CreateCourse) (int, error) {
 	if err := input.Validate(); err != nil {
-		return 0, err
+		return 0, apperror.BadRequest(err.Error(), err)
 	}
 	// пока нет у него lessons он не может быть активным
 	input.IsActive = false
@@ -57,7 +57,12 @@ func (cs *CourseService) Create(input models.CreateCourse) (int, error) {
 }
 
 func (cs *CourseService) GetAll() ([]models.Course, error) {
-	return cs.repo.GetAll()
+	courses, err := cs.repo.GetAll()
+	if err != nil {
+		return nil, apperror.Internal("failed to get courses", err)
+	}
+
+	return courses, nil
 }
 
 func (cs *CourseService) GetByID(ctx context.Context, id int) (models.Course, error) {
@@ -77,7 +82,7 @@ func (cs *CourseService) GetByID(ctx context.Context, id int) (models.Course, er
 func (cs *CourseService) DeleteByID(ctx context.Context, id int) error {
 	tx, err := cs.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return apperror.Internal("failed to start transaction", err)
 	}
 
 	defer func() {
@@ -85,11 +90,11 @@ func (cs *CourseService) DeleteByID(ctx context.Context, id int) error {
 	}()
 
 	if err = cs.lessonRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
-		return err
+		return apperror.Internal("failed to delete related lessons", err)
 	}
 
 	if err = cs.enrollRepo.DeleteByCourseIDTx(ctx, tx, id); err != nil {
-		return err
+		return apperror.Internal("failed to delete related enrollments", err)
 	}
 
 	if err = cs.repo.DeleteByIDTx(ctx, tx, id); err != nil {
@@ -100,7 +105,11 @@ func (cs *CourseService) DeleteByID(ctx context.Context, id int) error {
 		return apperror.Internal("failed to delete course", err)
 	}
 
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return apperror.Internal("failed to commit transaction", err)
+	}
+
+	return nil
 }
 
 func (cs *CourseService) Update(ctx context.Context, id int, input models.UpdateCourse) (int, error) {

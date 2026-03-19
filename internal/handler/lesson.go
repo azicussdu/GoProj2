@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -12,7 +11,7 @@ import (
 func (h *Handler) GetLessons(c *gin.Context) {
 	lessons, err := h.services.Lesson.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to select lessons"})
+		respondError(c, err)
 		return
 	}
 
@@ -28,11 +27,7 @@ func (h *Handler) GetLessonByID(c *gin.Context) {
 
 	lesson, err := h.services.Lesson.GetByID(id)
 	if err != nil {
-		if errors.Is(err, models.ErrLessonNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "lesson not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -49,11 +44,7 @@ func (h *Handler) CreateLesson(c *gin.Context) {
 	ctx := c.Request.Context()
 	id, err := h.services.Lesson.Create(ctx, input)
 	if err != nil {
-		if errors.Is(err, models.ErrCourseNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create lesson"})
+		respondError(c, err)
 		return
 	}
 
@@ -75,17 +66,8 @@ func (h *Handler) UpdateLesson(c *gin.Context) {
 
 	updatedID, err := h.services.Lesson.Update(id, input)
 	if err != nil {
-		switch {
-		case errors.Is(err, models.ErrLessonNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "lesson to update not found"})
-			return
-		case errors.Is(err, models.ErrCourseNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "course not found"})
-			return
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"id": updatedID})
@@ -101,11 +83,7 @@ func (h *Handler) DeleteLesson(c *gin.Context) {
 	ctx := c.Request.Context()
 	err = h.services.Lesson.DeleteByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, models.ErrLessonNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "lesson to delete not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 

@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
+	"github.com/azicussdu/GoProj2/internal/apperror"
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
 )
@@ -22,24 +24,28 @@ func NewEnrollmentService(repo repository.EnrollmentRepo, courseRepo repository.
 
 func (s *EnrollmentService) JoinCourse(ctx context.Context, user models.User, courseID int) (int, error) {
 	if user.ID <= 0 {
-		return 0, models.ErrUserNotFound
+		return 0, apperror.Unauthorized("user is not authenticated", models.ErrUserNotFound)
 	}
 
 	role := strings.TrimSpace(strings.ToLower(user.Role))
 	if role != models.RoleStudent {
-		return 0, models.ErrOnlyStudentsCanEnroll
+		return 0, apperror.Forbidden(models.ErrOnlyStudentsCanEnroll.Error(), models.ErrOnlyStudentsCanEnroll)
 	}
 
 	if _, err := s.courseRepo.GetByID(ctx, courseID); err != nil {
-		return 0, err
+		if errors.Is(err, models.ErrCourseNotFound) {
+			return 0, apperror.NotFound("course not found", err)
+		}
+
+		return 0, apperror.Internal("failed to get course", err)
 	}
 
 	alreadyEnrolled, err := s.repo.Exists(ctx, user.ID, courseID)
 	if err != nil {
-		return 0, err
+		return 0, apperror.Internal("failed to check enrollment", err)
 	}
 	if alreadyEnrolled {
-		return 0, models.ErrEnrollmentAlreadyExists
+		return 0, apperror.Conflict(models.ErrEnrollmentAlreadyExists.Error(), models.ErrEnrollmentAlreadyExists)
 	}
 
 	input := models.CreateEnrollment{
@@ -50,35 +56,64 @@ func (s *EnrollmentService) JoinCourse(ctx context.Context, user models.User, co
 		CompletedAt: nil,
 	}
 
-	return s.repo.Create(ctx, input)
+	id, err := s.repo.Create(ctx, input)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrCourseNotFound):
+			return 0, apperror.NotFound("course not found", err)
+		case errors.Is(err, models.ErrEnrollmentAlreadyExists):
+			return 0, apperror.Conflict(models.ErrEnrollmentAlreadyExists.Error(), err)
+		default:
+			return 0, apperror.Internal("failed to enroll in course", err)
+		}
+	}
+
+	return id, nil
 }
 
 func (s *EnrollmentService) LeaveCourse(ctx context.Context, user models.User, courseID int) error {
 	if user.ID <= 0 {
-		return models.ErrUserNotFound
+		return apperror.Unauthorized("user is not authenticated", models.ErrUserNotFound)
 	}
 
 	role := strings.TrimSpace(strings.ToLower(user.Role))
 	if role != models.RoleStudent {
-		return models.ErrOnlyStudentsCanEnroll
+		return apperror.Forbidden(models.ErrOnlyStudentsCanEnroll.Error(), models.ErrOnlyStudentsCanEnroll)
 	}
 
 	if _, err := s.courseRepo.GetByID(ctx, courseID); err != nil {
-		return err
+		if errors.Is(err, models.ErrCourseNotFound) {
+			return apperror.NotFound("course not found", err)
+		}
+
+		return apperror.Internal("failed to get course", err)
 	}
 
-	return s.repo.DeleteByUserAndCourse(ctx, user.ID, courseID)
+	if err := s.repo.DeleteByUserAndCourse(ctx, user.ID, courseID); err != nil {
+		if errors.Is(err, models.ErrEnrollmentNotFound) {
+			return apperror.NotFound(models.ErrEnrollmentNotFound.Error(), err)
+		}
+
+		return apperror.Internal("failed to leave course", err)
+	}
+
+	return nil
 }
 
 func (s *EnrollmentService) GetMyCourses(ctx context.Context, user models.User) ([]models.MyCourse, error) {
 	if user.ID <= 0 {
-		return nil, models.ErrUserNotFound
+		return nil, apperror.Unauthorized("user is not authenticated", models.ErrUserNotFound)
 	}
 
 	role := strings.TrimSpace(strings.ToLower(user.Role))
 	if role != models.RoleStudent {
-		return nil, models.ErrOnlyStudentsCanEnroll
+		return nil, apperror.Forbidden(models.ErrOnlyStudentsCanEnroll.Error(), models.ErrOnlyStudentsCanEnroll)
 	}
 
-	return s.repo.GetMyCourses(ctx, user.ID)
+	courses, err := s.repo.GetMyCourses(ctx, user.ID)
+	if err != nil {
+		return nil, apperror.Internal("failed to get my courses", err)
+	}
+
+	return courses, nil
 }
