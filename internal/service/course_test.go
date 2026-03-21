@@ -178,7 +178,7 @@ var errDB = errors.New("db error")
 //---------------------------------------------------------------------
 
 func TestCourseService_GetByID_Success(t *testing.T) {
-	mCourseRepo := &MockCourseRepo{}
+	mCourseRepo := &MockCourseRepo{} // = new(MockCourseRepo)
 	mLessonRepo := &MockLessonRepo{}
 	mEnrollRepo := &MockEnrollmentRepo{}
 
