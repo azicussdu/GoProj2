@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"testing"
 
+	"github.com/azicussdu/GoProj2/internal/apperror"
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
 	"github.com/jmoiron/sqlx"
@@ -156,21 +159,269 @@ func (m *MockEnrollmentRepo) GetMyCourses(ctx context.Context, userID int) ([]mo
 
 //---------------------------------------------------------------------
 
+func assertAppErr(t *testing.T, err error, expectedCode int, expectedMessage string, expectedWrapped error) {
+	t.Helper()
+
+	var appErr *apperror.AppError
+
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, expectedCode, appErr.Code)
+	assert.Equal(t, expectedMessage, appErr.Message)
+
+	if expectedWrapped != nil {
+		assert.ErrorIs(t, err, expectedWrapped)
+	}
+}
+
+var errDB = errors.New("db error")
+
+//---------------------------------------------------------------------
+
 func TestCourseService_GetByID_Success(t *testing.T) {
-	mCourseRepo := new(MockCourseRepo)
-	mLessonRepo := new(MockLessonRepo)
-	mEnrollRepo := new(MockEnrollmentRepo)
+	mCourseRepo := &MockCourseRepo{}
+	mLessonRepo := &MockLessonRepo{}
+	mEnrollRepo := &MockEnrollmentRepo{}
 
 	ctx := context.Background()
 	expectedCourse := models.Course{ID: 1, Title: "Golang"}
 
-	mCourseRepo.On("GetByID", ctx, 1).Return(expectedCourse, nil)
+	mCourseRepo.On("GetByID", ctx, 1).Return(expectedCourse, nil).Once()
 
 	courseSrv := NewCourseService(mCourseRepo, mLessonRepo, mEnrollRepo, nil)
-	course, err := courseSrv.GetByID(ctx, 2)
+	course, err := courseSrv.GetByID(ctx, 1)
 
 	require.NoError(t, err)
 	assert.Equal(t, expectedCourse, course)
 
 	mCourseRepo.AssertExpectations(t)
+}
+
+func TestCourseService_GetByID_NotFound(t *testing.T) {
+	mCourseRepo := new(MockCourseRepo)
+	mLessonRepo := new(MockLessonRepo)
+	mEnrollRepo := new(MockEnrollmentRepo)
+
+	ctx := context.Background()
+
+	mCourseRepo.On("GetByID", ctx, 2).
+		Return(models.Course{}, models.ErrCourseNotFound).Once()
+
+	courseSrv := NewCourseService(mCourseRepo, mLessonRepo, mEnrollRepo, nil)
+	_, err := courseSrv.GetByID(ctx, 2)
+
+	require.Error(t, err)
+
+	assertAppErr(
+		t,
+		err,
+		http.StatusNotFound,
+		"course not found",
+		models.ErrCourseNotFound,
+	)
+
+	mCourseRepo.AssertExpectations(t)
+}
+
+func TestCourseService_GetByID_InternalError(t *testing.T) {
+	mCourseRepo := new(MockCourseRepo)
+	mLessonRepo := new(MockLessonRepo)
+	mEnrollRepo := new(MockEnrollmentRepo)
+
+	ctx := context.Background()
+
+	mCourseRepo.On("GetByID", ctx, 3).
+		Return(models.Course{}, errDB).Once()
+
+	courseSrv := NewCourseService(mCourseRepo, mLessonRepo, mEnrollRepo, nil)
+	_, err := courseSrv.GetByID(ctx, 3)
+
+	require.Error(t, err)
+
+	assertAppErr(
+		t,
+		err,
+		http.StatusInternalServerError,
+		"failed to get course",
+		errDB,
+	)
+
+	mCourseRepo.AssertExpectations(t)
+}
+
+func TestSimple(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int
+		expected int
+	}{
+		{
+			name:     "test 1",
+			input:    2,
+			expected: 4,
+		},
+		{
+			name:     "test 2",
+			input:    3,
+			expected: 9,
+		},
+		{
+			name:     "test 3",
+			input:    5,
+			expected: 25,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.input * tt.input
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TABLE-DRIVEN tests
+func TestCourseService_GetByID(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name       string
+		id         int
+		setup      func(repo *MockCourseRepo)
+		expected   models.Course
+		errCode    int
+		errMsg     string
+		errWrapped error
+	}{
+		{
+			name: "success",
+			id:   1,
+			setup: func(r *MockCourseRepo) {
+				r.On("GetByID", ctx, 1).Return(models.Course{ID: 1, Title: "Go"}, nil).Once()
+			},
+			expected: models.Course{ID: 1, Title: "Go"},
+		},
+		{
+			name: "not found",
+			id:   2,
+			setup: func(r *MockCourseRepo) {
+				r.On("GetByID", ctx, 2).Return(models.Course{}, models.ErrCourseNotFound).Once()
+			},
+			errCode:    http.StatusNotFound,
+			errMsg:     "course not found",
+			errWrapped: models.ErrCourseNotFound,
+		},
+		{
+			name: "internal",
+			id:   3,
+			setup: func(r *MockCourseRepo) {
+				r.On("GetByID", ctx, 3).Return(models.Course{}, errDB).Once()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to get course",
+			errWrapped: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			courseRepo := new(MockCourseRepo)
+			tt.setup(courseRepo)
+			svc := NewCourseService(courseRepo, new(MockLessonRepo), new(MockEnrollmentRepo), nil)
+
+			course, err := svc.GetByID(ctx, tt.id)
+
+			if tt.errCode == 0 {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, course)
+			} else {
+				require.Error(t, err)
+				assertAppErr(t, err, tt.errCode, tt.errMsg, tt.errWrapped)
+			}
+
+			courseRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCourseService_Create(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       models.CreateCourse
+		setup       func(repo *MockCourseRepo)
+		expectedID  int
+		errCode     int
+		errMsg      string
+		errWrapped  error
+		errContains string
+	}{
+		{
+			name:    "bad request validation",
+			input:   models.CreateCourse{Title: "", Price: 100, TeacherID: 1},
+			errCode: http.StatusBadRequest,
+			errMsg:  "course title is required",
+		},
+		{
+			name:  "teacher not found",
+			input: models.CreateCourse{Title: "Go", Slug: "go", Price: 100, TeacherID: 7},
+			setup: func(r *MockCourseRepo) {
+				r.On("Create",
+					mock.MatchedBy(func(in models.CreateCourse) bool { return in.IsActive == false })).
+					Return(0, models.ErrTeacherNotFound).Once()
+			},
+			errCode:    http.StatusNotFound,
+			errMsg:     "teacher not found",
+			errWrapped: models.ErrTeacherNotFound,
+		},
+		{
+			name:  "slug conflict",
+			input: models.CreateCourse{Title: "Go", Slug: "go", Price: 100, TeacherID: 7},
+			setup: func(r *MockCourseRepo) {
+				r.On("Create", mock.Anything).Return(0, models.ErrSlugAlreadyExists).Once()
+			},
+			errCode:    http.StatusConflict,
+			errMsg:     "slug already exists",
+			errWrapped: models.ErrSlugAlreadyExists,
+		},
+		{
+			name:  "internal error",
+			input: models.CreateCourse{Title: "Go", Slug: "go", Price: 100, TeacherID: 7},
+			setup: func(r *MockCourseRepo) {
+				r.On("Create", mock.Anything).Return(0, errDB).Once()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to create course",
+			errWrapped: errDB,
+		},
+		{
+			name:  "success with forced inactive",
+			input: models.CreateCourse{Title: "Go", Slug: "go", Price: 100, TeacherID: 7, IsActive: true},
+			setup: func(r *MockCourseRepo) {
+				r.On("Create", mock.MatchedBy(func(in models.CreateCourse) bool {
+					return in.Title == "Go" && in.IsActive == false
+				})).Return(44, nil).Once()
+			},
+			expectedID: 44,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			courseRepo := new(MockCourseRepo)
+			if tt.setup != nil {
+				tt.setup(courseRepo)
+			}
+			svc := NewCourseService(courseRepo, new(MockLessonRepo), new(MockEnrollmentRepo), nil)
+
+			id, err := svc.Create(tt.input)
+
+			if tt.errCode == 0 {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedID, id)
+			} else {
+				require.Error(t, err)
+				assertAppErr(t, err, tt.errCode, tt.errMsg, tt.errWrapped)
+			}
+
+			courseRepo.AssertExpectations(t)
+		})
+	}
 }
