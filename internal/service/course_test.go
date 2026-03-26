@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/azicussdu/GoProj2/internal/apperror"
 	"github.com/azicussdu/GoProj2/internal/models"
 	"github.com/azicussdu/GoProj2/internal/repository"
@@ -174,6 +175,10 @@ func assertAppErr(t *testing.T, err error, expectedCode int, expectedMessage str
 }
 
 var errDB = errors.New("db error")
+
+func ptr[T any](v T) *T {
+	return &v
+}
 
 //---------------------------------------------------------------------
 
@@ -422,6 +427,306 @@ func TestCourseService_Create(t *testing.T) {
 			}
 
 			courseRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCourseService_GetAll(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(repo *MockCourseRepo)
+		expected   []models.Course
+		errCode    int
+		errMsg     string
+		errWrapped error
+	}{
+		{
+			name: "success",
+			setup: func(repo *MockCourseRepo) {
+				repo.On("GetAll").Return([]models.Course{
+					{ID: 1, Title: "Go"},
+					{ID: 2, Title: "Python"},
+				}, nil).Once()
+			},
+			expected: []models.Course{
+				{ID: 1, Title: "Go"},
+				{ID: 2, Title: "Python"},
+			},
+		},
+		{
+			name: "internal error",
+			setup: func(repo *MockCourseRepo) {
+				repo.On("GetAll").Return(nil, errDB).Once()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to get courses",
+			errWrapped: errDB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			courseRepo := new(MockCourseRepo)
+			tt.setup(courseRepo)
+			svc := NewCourseService(courseRepo, new(MockLessonRepo), new(MockEnrollmentRepo), nil)
+
+			courses, err := svc.GetAll()
+
+			if tt.errCode == 0 {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, courses)
+			} else {
+				require.Error(t, err)
+				assertAppErr(t, err, tt.errCode, tt.errMsg, tt.errWrapped)
+			}
+
+			courseRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCourseService_Update(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		id         int
+		input      models.UpdateCourse
+		setup      func(courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo)
+		expectedID int
+		errCode    int
+		errMsg     string
+		errWrapped error
+	}{
+		{
+			name:  "activate check lessons internal error",
+			id:    1,
+			input: models.UpdateCourse{IsActive: ptr(true)},
+			setup: func(_ *MockCourseRepo, lessonRepo *MockLessonRepo) {
+				lessonRepo.On("GetByCourseID", 1).Return(nil, errDB).Once()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to check lessons",
+			errWrapped: errDB,
+		},
+		{
+			name:  "activate without lessons",
+			id:    2,
+			input: models.UpdateCourse{IsActive: ptr(true)},
+			setup: func(_ *MockCourseRepo, lessonRepo *MockLessonRepo) {
+				lessonRepo.On("GetByCourseID", 2).Return([]models.Lesson{}, nil).Once()
+			},
+			errCode:    http.StatusBadRequest,
+			errMsg:     models.ErrCourseCannotBeActivated.Error(),
+			errWrapped: models.ErrCourseCannotBeActivated,
+		},
+		{
+			name:  "course not found",
+			id:    3,
+			input: models.UpdateCourse{Title: ptr("Updated title")},
+			setup: func(courseRepo *MockCourseRepo, _ *MockLessonRepo) {
+				courseRepo.On("Update", ctx, 3, models.UpdateCourse{Title: ptr("Updated title")}).Return(0, models.ErrCourseNotFound).Once()
+			},
+			errCode:    http.StatusNotFound,
+			errMsg:     "course not found",
+			errWrapped: models.ErrCourseNotFound,
+		},
+		{
+			name:  "slug already exists",
+			id:    4,
+			input: models.UpdateCourse{Title: ptr("Updated title")},
+			setup: func(courseRepo *MockCourseRepo, _ *MockLessonRepo) {
+				courseRepo.On("Update", ctx, 4, models.UpdateCourse{Title: ptr("Updated title")}).Return(0, models.ErrSlugAlreadyExists).Once()
+			},
+			errCode:    http.StatusConflict,
+			errMsg:     "slug already exists",
+			errWrapped: models.ErrSlugAlreadyExists,
+		},
+		{
+			name:  "update internal error",
+			id:    5,
+			input: models.UpdateCourse{Title: ptr("Updated title")},
+			setup: func(courseRepo *MockCourseRepo, _ *MockLessonRepo) {
+				courseRepo.On("Update", ctx, 5, models.UpdateCourse{Title: ptr("Updated title")}).Return(0, errDB).Once()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to update course",
+			errWrapped: errDB,
+		},
+		{
+			name:  "success with activation",
+			id:    6,
+			input: models.UpdateCourse{IsActive: ptr(true)},
+			setup: func(courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo) {
+				lessonRepo.On("GetByCourseID", 6).Return([]models.Lesson{{ID: 10, CourseID: 6}}, nil).Once()
+				courseRepo.On("Update", ctx, 6, models.UpdateCourse{IsActive: ptr(true)}).Return(6, nil).Once()
+			},
+			expectedID: 6,
+		},
+		{
+			name:  "success without activation check",
+			id:    7,
+			input: models.UpdateCourse{Title: ptr("Updated title")},
+			setup: func(courseRepo *MockCourseRepo, _ *MockLessonRepo) {
+				courseRepo.On("Update", ctx, 7, models.UpdateCourse{Title: ptr("Updated title")}).Return(7, nil).Once()
+			},
+			expectedID: 7,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			courseRepo := new(MockCourseRepo)
+			lessonRepo := new(MockLessonRepo)
+			if tt.setup != nil {
+				tt.setup(courseRepo, lessonRepo)
+			}
+
+			svc := NewCourseService(courseRepo, lessonRepo, new(MockEnrollmentRepo), nil)
+			id, err := svc.Update(ctx, tt.id, tt.input)
+
+			if tt.errCode == 0 {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedID, id)
+			} else {
+				require.Error(t, err)
+				assertAppErr(t, err, tt.errCode, tt.errMsg, tt.errWrapped)
+			}
+
+			courseRepo.AssertExpectations(t)
+			lessonRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCourseService_DeleteByID(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		id         int
+		setup      func(sqlMock sqlmock.Sqlmock, courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo)
+		errCode    int
+		errMsg     string
+		errWrapped error
+	}{
+		{
+			name: "begin transaction error",
+			id:   1,
+			setup: func(sqlMock sqlmock.Sqlmock, _ *MockCourseRepo, _ *MockLessonRepo, _ *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin().WillReturnError(errDB)
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to start transaction",
+			errWrapped: errDB,
+		},
+		{
+			name: "delete lessons error",
+			id:   2,
+			setup: func(sqlMock sqlmock.Sqlmock, _ *MockCourseRepo, lessonRepo *MockLessonRepo, _ *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 2).Return(errDB).Once()
+				sqlMock.ExpectRollback()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to delete related lessons",
+			errWrapped: errDB,
+		},
+		{
+			name: "delete enrollments error",
+			id:   3,
+			setup: func(sqlMock sqlmock.Sqlmock, _ *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 3).Return(nil).Once()
+				enrollRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 3).Return(errDB).Once()
+				sqlMock.ExpectRollback()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to delete related enrollments",
+			errWrapped: errDB,
+		},
+		{
+			name: "course not found",
+			id:   4,
+			setup: func(sqlMock sqlmock.Sqlmock, courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 4).Return(nil).Once()
+				enrollRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 4).Return(nil).Once()
+				courseRepo.On("DeleteByIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 4).Return(models.ErrCourseNotFound).Once()
+				sqlMock.ExpectRollback()
+			},
+			errCode:    http.StatusNotFound,
+			errMsg:     "course not found",
+			errWrapped: models.ErrCourseNotFound,
+		},
+		{
+			name: "delete course internal error",
+			id:   5,
+			setup: func(sqlMock sqlmock.Sqlmock, courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 5).Return(nil).Once()
+				enrollRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 5).Return(nil).Once()
+				courseRepo.On("DeleteByIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 5).Return(errDB).Once()
+				sqlMock.ExpectRollback()
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to delete course",
+			errWrapped: errDB,
+		},
+		{
+			name: "commit error",
+			id:   6,
+			setup: func(sqlMock sqlmock.Sqlmock, courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 6).Return(nil).Once()
+				enrollRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 6).Return(nil).Once()
+				courseRepo.On("DeleteByIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 6).Return(nil).Once()
+				sqlMock.ExpectCommit().WillReturnError(errDB)
+			},
+			errCode:    http.StatusInternalServerError,
+			errMsg:     "failed to commit transaction",
+			errWrapped: errDB,
+		},
+		{
+			name: "success",
+			id:   7,
+			setup: func(sqlMock sqlmock.Sqlmock, courseRepo *MockCourseRepo, lessonRepo *MockLessonRepo, enrollRepo *MockEnrollmentRepo) {
+				sqlMock.ExpectBegin()
+				lessonRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 7).Return(nil).Once()
+				enrollRepo.On("DeleteByCourseIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 7).Return(nil).Once()
+				courseRepo.On("DeleteByIDTx", ctx, mock.AnythingOfType("*sqlx.Tx"), 7).Return(nil).Once()
+				sqlMock.ExpectCommit()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, sqlMock, err := sqlmock.New()
+			require.NoError(t, err)
+
+			courseRepo := new(MockCourseRepo)
+			lessonRepo := new(MockLessonRepo)
+			enrollRepo := new(MockEnrollmentRepo)
+			tt.setup(sqlMock, courseRepo, lessonRepo, enrollRepo)
+			sqlMock.ExpectClose()
+
+			sxDB := sqlx.NewDb(db, "sqlmock")
+			svc := NewCourseService(courseRepo, lessonRepo, enrollRepo, sxDB)
+			err = svc.DeleteByID(ctx, tt.id)
+
+			if tt.errCode == 0 {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assertAppErr(t, err, tt.errCode, tt.errMsg, tt.errWrapped)
+			}
+
+			courseRepo.AssertExpectations(t)
+			lessonRepo.AssertExpectations(t)
+			enrollRepo.AssertExpectations(t)
+			require.NoError(t, db.Close())
+			require.NoError(t, sqlMock.ExpectationsWereMet())
 		})
 	}
 }
