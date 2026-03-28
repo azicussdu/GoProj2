@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -14,6 +15,7 @@ type Config struct {
 
 	Database *DBConfig
 	JWT      *JWTConfig
+	Redis    *RedisConfig
 }
 
 type DBConfig struct {
@@ -32,6 +34,12 @@ type JWTConfig struct {
 	Issuer     string
 }
 
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
+}
+
 func Load() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
 		return nil, err
@@ -43,6 +51,11 @@ func Load() (*Config, error) {
 	}
 
 	refreshTTL, err := parseDurationEnv("JWT_REFRESH_TTL", "720h")
+	if err != nil {
+		return nil, err
+	}
+
+	redisDB, err := parseIntEnv("REDIS_DB", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +78,11 @@ func Load() (*Config, error) {
 			RefreshTTL: refreshTTL,
 			Issuer:     getEnv("JWT_ISSUER", "company-name"),
 		},
+		Redis: &RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       redisDB,
+		},
 	}, nil
 }
 
@@ -83,4 +101,14 @@ func parseDurationEnv(key, defaultValue string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid duration for %s: %w", key, err)
 	}
 	return duration, nil
+}
+
+func parseIntEnv(key string, defaultValue int) (int, error) {
+	value := getEnv(key, strconv.Itoa(defaultValue))
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid int for %s: %w", key, err)
+	}
+
+	return parsed, nil
 }

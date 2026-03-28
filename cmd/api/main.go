@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/azicussdu/GoProj2/internal/auth"
 	"github.com/azicussdu/GoProj2/internal/config"
@@ -13,6 +15,7 @@ import (
 	"github.com/azicussdu/GoProj2/internal/server"
 	"github.com/azicussdu/GoProj2/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -54,12 +57,13 @@ func buildApp(cfg *config.Config) (*gin.Engine, error) {
 	lessonRepo := repository.NewPsgLessonRepo(db)
 	enrollmentRepo := repository.NewPsgEnrollmentRepo(db)
 	userRepo := repository.NewPsgUserRepo(db)
+	redisClient := initRedisClient(cfg)
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL, cfg.JWT.Issuer)
 
 	// Cобрали все сервисе в одним файле
 	services := &service.Services{
-		Course:     service.NewCourseService(courseRepo, lessonRepo, enrollmentRepo, db),
+		Course:     service.NewCourseService(courseRepo, lessonRepo, enrollmentRepo, db, redisClient),
 		Lesson:     service.NewLessonService(lessonRepo, courseRepo, db),
 		Enrollment: service.NewEnrollmentService(enrollmentRepo, courseRepo),
 		Auth:       service.NewAuthService(userRepo, jwtManager),
@@ -69,4 +73,24 @@ func buildApp(cfg *config.Config) (*gin.Engine, error) {
 	router, err := h.InitRoutes()
 
 	return router, nil
+}
+
+func initRedisClient(cfg *config.Config) *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		slog.Warn("redis is unavailable, continuing without cache", "error", err.Error())
+		_ = client.Close()
+		return nil
+	}
+
+	slog.Info("Redis connected successfully")
+	return client
 }
