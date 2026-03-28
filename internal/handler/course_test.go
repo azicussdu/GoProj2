@@ -21,7 +21,7 @@ type MockCourseService struct {
 	mock.Mock
 }
 
-var _ service.Course = (*MockCourseService)(nil)
+var _ service.CourseServiceI = (*MockCourseService)(nil)
 
 func (m *MockCourseService) Create(input models.CreateCourse) (int, error) {
 	args := m.Called(input)
@@ -66,7 +66,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func newCourseHandler(courseSvc service.Course) *Handler {
+func newCourseHandler(courseSvc service.CourseServiceI) *Handler {
 	return &Handler{
 		services: &service.Services{
 			Course: courseSvc,

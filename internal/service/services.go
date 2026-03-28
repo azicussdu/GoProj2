@@ -6,7 +6,7 @@ import (
 	"github.com/azicussdu/GoProj2/internal/models"
 )
 
-type Course interface {
+type CourseServiceI interface {
 	Create(input models.CreateCourse) (int, error)
 	GetAll() ([]models.Course, error)
 	GetByID(ctx context.Context, id int) (models.Course, error)
@@ -15,7 +15,7 @@ type Course interface {
 }
 
 type Services struct {
-	Course     Course
+	Course     CourseServiceI
 	Lesson     *LessonService
 	Enrollment *EnrollmentService
 	Auth       *AuthService
