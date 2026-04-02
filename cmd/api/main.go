@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Server started", "port", cfg.Port)
+	slog.Info("Server started at", "port", cfg.Port)
 }
 
 func buildApp(cfg *config.Config) (*gin.Engine, error) {
